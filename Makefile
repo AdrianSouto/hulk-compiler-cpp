@@ -4,7 +4,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude -fexceptions
 LLVM_CONFIG = llvm-config
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions//g') -fexceptions
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions)
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
 

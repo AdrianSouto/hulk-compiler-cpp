@@ -1,4 +1,14 @@
-let a = 10 in while (a >= 0) {
-    print(a);
-    a := a - 1;
+type PersonType(firstname_func, lastname_func , uno) {
+    firstname_func = firstname_func;
+    lastname_func = lastname_func;
+    uno = uno;
+
+    name_func() => uno @@ "self.lastname_func";
 }
+
+type KnightType inherits PersonType {
+    name_func() => "Siir" @@ base();
+}
+
+let p = new KnightType("Philo", "Collinse" , "awa") in
+    print(p.name_func()); // prints 'Sir Phil Collins'

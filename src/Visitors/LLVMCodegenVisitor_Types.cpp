@@ -1,9 +1,11 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Statements/TypeDefNode.hpp"
+#include "Statements/DefFuncNode.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
 #include "Expressions/SelfMemberAccessNode.hpp"
 #include "Expressions/MemberAccessNode.hpp"
 #include "Expressions/MethodCallNode.hpp"
+#include "Expressions/VariableNode.hpp"
 #include "Expressions/IsNode.hpp"
 #include "Expressions/AsNode.hpp"
 #include "Globals.hpp"
@@ -13,129 +15,307 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Instructions.h>
 #include <iostream>
 
 
-void LLVMCodegenVisitor::visit(TypeDefNode& node) {
-    
-    std::vector<llvm::Type*> memberTypes;
-    
-    
-    for (const auto& attr : node.attributes) {
-        llvm::Type* attrType = nullptr;
-        
-        
-        if (attr.type && attr.type->toString() == "Number") {
-            attrType = llvm::Type::getDoubleTy(ctx);
-        } else if (attr.type && attr.type->toString() == "String") {
-            attrType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-        } else if (attr.type && attr.type->toString() == "Boolean") {
-            attrType = llvm::Type::getInt1Ty(ctx);
-        } else {
-            
-            attrType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0); 
-        }
-        
-        memberTypes.push_back(attrType);
+static std::map<std::string, llvm::StructType*> structTypes;
+
+
+static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
+    if (typeName == "Number") {
+        return llvm::Type::getDoubleTy(ctx);
+    } else if (typeName == "String") {
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+    } else if (typeName == "Boolean") {
+        return llvm::Type::getInt1Ty(ctx);
+    } else if (typeName == "Object") {
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     }
-    
-    
-    llvm::StructType* structType = llvm::StructType::create(ctx, memberTypes, node.typeName);
-    
-    
-    
-    
-    
-    if (!node.typeArguments.empty()) {
-        std::vector<llvm::Type*> paramTypes;
-        
-        
-        for (const auto& param : node.typeArguments) {
-            if (param.type && param.type->toString() == "Number") {
-                paramTypes.push_back(llvm::Type::getDoubleTy(ctx));
-            } else if (param.type && param.type->toString() == "String") {
-                paramTypes.push_back(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
-            } else if (param.type && param.type->toString() == "Boolean") {
-                paramTypes.push_back(llvm::Type::getInt1Ty(ctx));
-            } else {
-                paramTypes.push_back(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
-            }
-        }
-        
-        
-        llvm::Type* returnType = llvm::PointerType::get(structType, 0);
-        
-        
-        llvm::FunctionType* constructorType = llvm::FunctionType::get(returnType, paramTypes, false);
-        
-        
-        std::string constructorName = node.typeName + "_constructor";
-        llvm::Function* constructor = llvm::Function::Create(
-            constructorType, 
-            llvm::Function::ExternalLinkage, 
-            constructorName, 
-            &module
-        );
-        
-        
-        llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(ctx, "entry", constructor);
-        builder.SetInsertPoint(constructorBB);
-        
-        
-        llvm::Value* instance = builder.CreateAlloca(structType, nullptr, "instance");
-        
-        
-        auto argIt = constructor->arg_begin();
-        for (size_t i = 0; i < node.attributes.size() && i < node.typeArguments.size(); ++i) {
-            llvm::Value* fieldPtr = builder.CreateStructGEP(structType, instance, i);
-            builder.CreateStore(&*argIt, fieldPtr);
-            ++argIt;
-        }
-        
-        
-        builder.CreateRet(instance);
-    }
-    
-    lastValue = nullptr; 
+
+    return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
 }
 
 
+static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::Type* type, const std::string& varName) {
+    llvm::IRBuilder<> tmpB(&function->getEntryBlock(), function->getEntryBlock().begin());
+    return tmpB.CreateAlloca(type, nullptr, varName);
+}
+
+void LLVMCodegenVisitor::visit(TypeDefNode& node) {
+
+    std::vector<llvm::Type*> memberTypes;
+    std::vector<std::string> memberNames;
+    
+
+    if (!node.parentTypeName.empty()) {
+        auto parentTypeIt = types.find(node.parentTypeName);
+        if (parentTypeIt != types.end()) {
+            TypeDefNode* parentTypeDef = parentTypeIt->second;
+
+            for (const auto& attr : parentTypeDef->attributes) {
+                std::string typeName = "Object";
+                if (attr.type) {
+                    typeName = attr.type->toString();
+                }
+                llvm::Type* attrType = getLLVMTypeFromName(typeName, ctx);
+                memberTypes.push_back(attrType);
+                memberNames.push_back(attr.name);
+            }
+        }
+    }
+    
+
+    for (const auto& attr : node.attributes) {
+        std::string typeName = "Object";
+        if (attr.type) {
+            typeName = attr.type->toString();
+        }
+        llvm::Type* attrType = getLLVMTypeFromName(typeName, ctx);
+        memberTypes.push_back(attrType);
+        memberNames.push_back(attr.name);
+    }
+    
+
+    if (memberTypes.empty()) {
+        memberTypes.push_back(llvm::Type::getInt8Ty(ctx));
+    }
+    
+
+    llvm::StructType* structType = llvm::StructType::create(ctx, memberTypes, node.typeName);
+    
+
+    structTypes[node.typeName] = structType;
+    
+
+    for (auto method : node.methods) {
+
+        if (auto defFunc = dynamic_cast<DefFuncNode*>(method)) {
+
+            std::string originalName = defFunc->identifier;
+            defFunc->identifier = node.typeName + "_" + originalName;
+            
+
+            bool hasSelfParam = false;
+            for (const auto& param : defFunc->parameters) {
+                if (param.name == "self") {
+                    hasSelfParam = true;
+                    break;
+                }
+            }
+            
+            if (!hasSelfParam) {
+
+                Parameter selfParam("self", nullptr);
+                defFunc->parameters.insert(defFunc->parameters.begin(), selfParam);
+            }
+            
+
+            std::string previousTypeName = currentTypeName;
+            currentTypeName = node.typeName;
+            
+
+            defFunc->accept(*this);
+            
+
+            currentTypeName = previousTypeName;
+            
+
+            defFunc->identifier = originalName;
+        }
+    }
+    
+
+    std::string constructorName = "new_" + node.typeName;
+    
+
+    std::vector<llvm::Type*> constructorParamTypes;
+    
+
+    if (!node.parentTypeName.empty()) {
+        auto parentTypeIt = types.find(node.parentTypeName);
+        if (parentTypeIt != types.end()) {
+            TypeDefNode* parentTypeDef = parentTypeIt->second;
+
+            for (const auto& param : parentTypeDef->typeArguments) {
+                std::string typeName = "Object";
+                if (param.type) {
+                    typeName = param.type->toString();
+                }
+                llvm::Type* paramType = getLLVMTypeFromName(typeName, ctx);
+                constructorParamTypes.push_back(paramType);
+            }
+        }
+    }
+    
+
+    for (const auto& param : node.typeArguments) {
+        std::string typeName = "Object";
+        if (param.type) {
+            typeName = param.type->toString();
+        }
+        llvm::Type* paramType = getLLVMTypeFromName(typeName, ctx);
+        constructorParamTypes.push_back(paramType);
+    }
+    
+    llvm::FunctionType* constructorType = llvm::FunctionType::get(
+        llvm::PointerType::get(structType, 0), 
+        constructorParamTypes,
+        false
+    );
+    
+    llvm::Function* constructorFunc = llvm::Function::Create(
+        constructorType, 
+        llvm::Function::ExternalLinkage, 
+        constructorName, 
+        module
+    );
+    
+
+    llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(ctx, "entry", constructorFunc);
+    llvm::IRBuilder<> constructorBuilder(constructorBB);
+    
+
+    llvm::Value* structSize = llvm::ConstantExpr::getSizeOf(structType);
+    llvm::Function* mallocFunc = module.getFunction("malloc");
+    if (!mallocFunc) {
+        llvm::FunctionType* mallocType = llvm::FunctionType::get(
+            llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+            {llvm::Type::getInt64Ty(ctx)},
+            false
+        );
+        mallocFunc = llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", module);
+    }
+    
+    llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, {structSize});
+    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));
+    
+
+    auto argIt = constructorFunc->arg_begin();
+    size_t memberIndex = 0;
+    
+
+    if (!node.parentTypeName.empty()) {
+        auto parentTypeIt = types.find(node.parentTypeName);
+        if (parentTypeIt != types.end()) {
+            TypeDefNode* parentTypeDef = parentTypeIt->second;
+            for (size_t i = 0; i < parentTypeDef->attributes.size(); ++i) {
+                llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
+                
+                llvm::Value* initValue = nullptr;
+                
+
+                if (i < parentTypeDef->typeArguments.size() && argIt != constructorFunc->arg_end()) {
+                    initValue = &*argIt;
+                    ++argIt;
+                } else {
+
+                    std::string attrTypeName = "Object";
+                    if (parentTypeDef->attributes[i].type) {
+                        attrTypeName = parentTypeDef->attributes[i].type->toString();
+                    }
+                    
+                    if (attrTypeName == "Number") {
+                        initValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
+                    } else if (attrTypeName == "Boolean") {
+                        initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
+                    } else if (attrTypeName == "String") {
+                        initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                    } else {
+                        initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                    }
+                }
+                
+                constructorBuilder.CreateStore(initValue, memberPtr);
+                memberIndex++;
+            }
+        }
+    }
+    
+
+    for (size_t i = 0; i < node.attributes.size(); ++i) {
+        llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
+        
+        llvm::Value* initValue = nullptr;
+        
+
+        if (i < node.typeArguments.size() && argIt != constructorFunc->arg_end()) {
+            initValue = &*argIt;
+            ++argIt;
+        } else {
+
+            std::string attrTypeName = "Object";
+            if (node.attributes[i].type) {
+                attrTypeName = node.attributes[i].type->toString();
+            }
+            
+            if (attrTypeName == "Number") {
+                initValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
+            } else if (attrTypeName == "Boolean") {
+                initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
+            } else if (attrTypeName == "String") {
+                initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+            } else {
+                initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+            }
+        }
+        
+        constructorBuilder.CreateStore(initValue, memberPtr);
+        memberIndex++;
+    }
+    
+    constructorBuilder.CreateRet(typedPtr);
+    
+    lastValue = nullptr;
+}
+
 void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
-    
-    std::string constructorName = node.typeName + "_constructor";
-    llvm::Function* constructor = module.getFunction(constructorName);
-    
-    if (!constructor) {
-        std::cerr << "Error: Constructor not found for type " << node.typeName << std::endl;
+
+    auto typeIt = types.find(node.typeName);
+    if (typeIt == types.end()) {
+        std::cerr << "Error: Unknown type '" << node.typeName << "'" << std::endl;
         lastValue = nullptr;
         return;
     }
     
+
+    std::string constructorName = "new_" + node.typeName;
+    llvm::Function* constructorFunc = module.getFunction(constructorName);
     
+    if (!constructorFunc) {
+        std::cerr << "Error: Constructor not found for type '" << node.typeName << "'" << std::endl;
+        lastValue = nullptr;
+        return;
+    }
+    
+
     std::vector<llvm::Value*> args;
-    for (auto* arg : node.arguments) {
+    for (auto arg : node.arguments) {
         arg->accept(*this);
         if (lastValue) {
             args.push_back(lastValue);
         }
     }
     
+
+    lastValue = builder.CreateCall(constructorFunc, args, "new_instance");
     
-    lastValue = builder.CreateCall(constructor, args, "instance");
+
+    variableTypes["temp_instance"] = node.typeName;
 }
 
-
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
+
+
     
+
+    llvm::Value* selfPtr = nullptr;
     
-    
-    llvm::AllocaInst* selfPtr = nullptr;
-    
-    
+
     for (auto it = localVarsStack.rbegin(); it != localVarsStack.rend(); ++it) {
         auto selfIt = it->find("self");
         if (selfIt != it->end()) {
-            selfPtr = selfIt->second;
+            selfPtr = builder.CreateLoad(selfIt->second->getAllocatedType(), selfIt->second, "self");
             break;
         }
     }
@@ -146,93 +326,209 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
         return;
     }
     
+
+    std::string selfTypeName = currentTypeName.empty() ? "Object" : currentTypeName;
     
-    llvm::Value* selfValue = builder.CreateLoad(selfPtr->getAllocatedType(), selfPtr, "self");
+    std::cerr << "DEBUG: SelfMemberAccessNode - currentTypeName='" << currentTypeName << "', selfTypeName='" << selfTypeName << "'" << std::endl;
     
-    
-    
-    
-    
-    
-    
-    int fieldIndex = 0; 
-    
-    
-    llvm::Type* selfType = selfPtr->getAllocatedType();
-    
-    
-    llvm::Value* fieldPtr = builder.CreateStructGEP(
-        selfType, 
-        selfValue, 
-        fieldIndex, 
-        node.attributeName
-    );
-    
-    
-    llvm::Type* fieldType = llvm::cast<llvm::StructType>(selfType)->getElementType(fieldIndex);
-    lastValue = builder.CreateLoad(fieldType, fieldPtr, node.attributeName);
+
+    auto typeIt = types.find(selfTypeName);
+    if (typeIt != types.end()) {
+        TypeDefNode* typeDef = typeIt->second;
+        
+
+        int attrIndex = -1;
+        size_t currentIndex = 0;
+        
+
+        if (!typeDef->parentTypeName.empty()) {
+            auto parentTypeIt = types.find(typeDef->parentTypeName);
+            if (parentTypeIt != types.end()) {
+                TypeDefNode* parentTypeDef = parentTypeIt->second;
+                for (size_t i = 0; i < parentTypeDef->attributes.size(); ++i) {
+                    if (parentTypeDef->attributes[i].name == node.attributeName) {
+                        attrIndex = currentIndex;
+                        break;
+                    }
+                    currentIndex++;
+                }
+            }
+        }
+        
+
+        if (attrIndex == -1) {
+            for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
+                if (typeDef->attributes[i].name == node.attributeName) {
+                    attrIndex = currentIndex;
+                    break;
+                }
+                currentIndex++;
+            }
+        }
+        
+        if (attrIndex >= 0) {
+            std::cerr << "DEBUG: Found attribute '" << node.attributeName << "' at index " << attrIndex << std::endl;
+            
+
+            auto structIt = structTypes.find(selfTypeName);
+            if (structIt != structTypes.end()) {
+                llvm::StructType* structType = structIt->second;
+                
+
+                llvm::Value* memberPtr = builder.CreateStructGEP(structType, selfPtr, attrIndex, "attr_ptr");
+                
+
+                llvm::Type* memberType = structType->getElementType(attrIndex);
+                lastValue = builder.CreateLoad(memberType, memberPtr, "attr_value");
+                
+                std::cerr << "DEBUG: Successfully loaded attribute '" << node.attributeName << "'" << std::endl;
+            } else {
+                std::cerr << "Error: Could not find struct type for " << selfTypeName << std::endl;
+                lastValue = nullptr;
+            }
+        } else {
+            std::cerr << "Error: Attribute '" << node.attributeName << "' not found in type '" << selfTypeName << "'" << std::endl;
+            lastValue = nullptr;
+        }
+    } else {
+        std::cerr << "Error: Type definition not found for self (selfTypeName='" << selfTypeName << "')" << std::endl;
+        std::cerr << "Available types: ";
+        for (const auto& typePair : types) {
+            std::cerr << "'" << typePair.first << "' ";
+        }
+        std::cerr << std::endl;
+        lastValue = nullptr;
+    }
 }
 
-
 void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
-    
+
     node.object->accept(*this);
-    llvm::Value* objectValue = lastValue;
+    llvm::Value* objPtr = lastValue;
     
-    if (!objectValue) {
+    if (!objPtr) {
         std::cerr << "Error: Invalid object in member access" << std::endl;
         lastValue = nullptr;
         return;
     }
     
+
+
+    std::string objTypeName = "Object";
     
-    
-    std::cerr << "Warning: MemberAccessNode visitor needs proper type tracking implementation" << std::endl;
-    lastValue = nullptr; 
+    auto typeIt = types.find(objTypeName);
+    if (typeIt != types.end()) {
+        TypeDefNode* typeDef = typeIt->second;
+        
+
+        int memberIndex = -1;
+        for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
+            if (typeDef->attributes[i].name == node.memberName) {
+                memberIndex = i;
+                break;
+            }
+        }
+        
+        if (memberIndex >= 0) {
+
+
+            std::cerr << "Warning: MemberAccessNode implementation is incomplete" << std::endl;
+            lastValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+        } else {
+            std::cerr << "Error: Member '" << node.memberName << "' not found" << std::endl;
+            lastValue = nullptr;
+        }
+    } else {
+        std::cerr << "Error: Type definition not found for object" << std::endl;
+        lastValue = nullptr;
+    }
 }
 
-
 void LLVMCodegenVisitor::visit(MethodCallNode& node) {
-    
+
     node.object->accept(*this);
-    llvm::Value* objectValue = lastValue;
+    llvm::Value* objPtr = lastValue;
     
-    if (!objectValue) {
+    if (!objPtr) {
         std::cerr << "Error: Invalid object in method call" << std::endl;
         lastValue = nullptr;
         return;
     }
     
+
+    std::string objTypeName = "";
     
-    
-    std::string methodName = node.methodName; 
-    llvm::Function* method = module.getFunction(methodName);
-    
-    if (!method) {
-        std::cerr << "Error: Method " << node.methodName << " not found" << std::endl;
-        lastValue = nullptr;
-        return;
+
+    if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
+
+        auto typeIt = variableTypes.find(varNode->identifier);
+        if (typeIt != variableTypes.end()) {
+            objTypeName = typeIt->second;
+        }
+        std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has type '" << objTypeName << "'" << std::endl;
+    } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
+        objTypeName = typeInstNode->typeName;
+        std::cerr << "DEBUG: Direct type instantiation of '" << objTypeName << "'" << std::endl;
     }
     
+
+    std::vector<std::string> typesToTry;
+    if (!objTypeName.empty()) {
+        typesToTry.push_back(objTypeName);
+        
+
+        auto typeIt = types.find(objTypeName);
+        if (typeIt != types.end() && !typeIt->second->parentTypeName.empty()) {
+            typesToTry.push_back(typeIt->second->parentTypeName);
+        }
+    } else {
+
+        for (const auto& typePair : types) {
+            typesToTry.push_back(typePair.first);
+        }
+    }
     
+    std::cerr << "DEBUG: Looking for method '" << node.methodName << "' in types: ";
+    for (const auto& type : typesToTry) {
+        std::cerr << type << " ";
+    }
+    std::cerr << std::endl;
+    
+
     std::vector<llvm::Value*> args;
-    args.push_back(objectValue);
+    args.push_back(objPtr);
     
-    
-    for (auto* arg : node.arguments) {
+    for (auto arg : node.arguments) {
         arg->accept(*this);
         if (lastValue) {
             args.push_back(lastValue);
         }
     }
     
+
+    llvm::Function* methodFunc = nullptr;
+    for (const std::string& typeName : typesToTry) {
+        std::string methodName = typeName + "_" + node.methodName;
+        std::cerr << "DEBUG: Trying method name: " << methodName << std::endl;
+        methodFunc = module.getFunction(methodName);
+        if (methodFunc) {
+            std::cerr << "DEBUG: Found method: " << methodName << std::endl;
+            break;
+        }
+    }
     
-    lastValue = builder.CreateCall(method, args, "method_result");
+    if (!methodFunc) {
+        std::cerr << "Error: Method '" << node.methodName << "' not found for object type" << std::endl;
+        lastValue = nullptr;
+        return;
+    }
+    
+
+    lastValue = builder.CreateCall(methodFunc, args, "method_result");
 }
 
-
 void LLVMCodegenVisitor::visit(IsNode& node) {
-    
+
     node.expression->accept(*this);
     llvm::Value* exprValue = lastValue;
     
@@ -242,31 +538,32 @@ void LLVMCodegenVisitor::visit(IsNode& node) {
         return;
     }
     
-    
+
     llvm::Type* exprType = exprValue->getType();
     bool isMatch = false;
     
+
     if (node.typeName == "Number") {
-        isMatch = exprType->isDoubleTy() || exprType->isFloatTy() || exprType->isIntegerTy();
+        isMatch = exprType->isDoubleTy() || exprType->isFloatTy() || 
+                 (exprType->isIntegerTy() && !exprType->isIntegerTy(1));
     } else if (node.typeName == "String") {
+
         isMatch = exprType->isPointerTy();
-        
-        
     } else if (node.typeName == "Boolean") {
         isMatch = exprType->isIntegerTy(1);
+    } else if (node.typeName == "Object") {
+        isMatch = exprType->isPointerTy();
     } else {
-        
-        
-        isMatch = false;
+
+
+        isMatch = exprType->isPointerTy();
     }
-    
     
     lastValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), isMatch ? 1 : 0);
 }
 
-
 void LLVMCodegenVisitor::visit(AsNode& node) {
-    
+
     node.expression->accept(*this);
     llvm::Value* exprValue = lastValue;
     
@@ -277,36 +574,50 @@ void LLVMCodegenVisitor::visit(AsNode& node) {
     }
     
     llvm::Type* exprType = exprValue->getType();
-    llvm::Type* targetType = nullptr;
+    llvm::Type* targetType = getLLVMTypeFromName(node.typeName, ctx);
     
-    
-    if (node.typeName == "Number") {
-        targetType = llvm::Type::getDoubleTy(ctx);
-    } else if (node.typeName == "String") {
-        targetType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-    } else if (node.typeName == "Boolean") {
-        targetType = llvm::Type::getInt1Ty(ctx);
-    } else {
-        
-        targetType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-    }
-    
-    
+
     if (exprType == targetType) {
-        
+
         lastValue = exprValue;
     } else if (exprType->isIntegerTy() && targetType->isDoubleTy()) {
-        
-        lastValue = builder.CreateSIToFP(exprValue, targetType, "int_to_double");
+
+        if (exprType->isIntegerTy(1)) {
+
+            llvm::Value* intVal = builder.CreateZExt(exprValue, llvm::Type::getInt32Ty(ctx));
+            lastValue = builder.CreateSIToFP(intVal, targetType, "bool_to_double");
+        } else {
+            lastValue = builder.CreateSIToFP(exprValue, targetType, "int_to_double");
+        }
     } else if (exprType->isDoubleTy() && targetType->isIntegerTy()) {
-        
-        lastValue = builder.CreateFPToSI(exprValue, targetType, "double_to_int");
+
+        if (targetType->isIntegerTy(1)) {
+
+            llvm::Value* zero = llvm::ConstantFP::get(exprType, 0.0);
+            lastValue = builder.CreateFCmpONE(exprValue, zero, "double_to_bool");
+        } else {
+            lastValue = builder.CreateFPToSI(exprValue, targetType, "double_to_int");
+        }
+    } else if (exprType->isIntegerTy(1) && targetType->isIntegerTy()) {
+
+        lastValue = builder.CreateZExt(exprValue, targetType, "bool_to_int");
+    } else if (exprType->isIntegerTy() && targetType->isIntegerTy(1)) {
+
+        llvm::Value* zero = llvm::ConstantInt::get(exprType, 0);
+        lastValue = builder.CreateICmpNE(exprValue, zero, "int_to_bool");
     } else if (exprType->isPointerTy() && targetType->isPointerTy()) {
-        
+
         lastValue = builder.CreateBitCast(exprValue, targetType, "ptr_cast");
     } else {
+
+        std::cerr << "Warning: Potentially unsafe cast in 'as' operation from " 
+                  << exprType->getTypeID() << " to " << targetType->getTypeID() << std::endl;
         
-        std::cerr << "Warning: Unsupported cast in 'as' operation" << std::endl;
-        lastValue = exprValue; 
+
+        if (exprType->isPointerTy() && targetType->isPointerTy()) {
+            lastValue = builder.CreateBitCast(exprValue, targetType, "unsafe_cast");
+        } else {
+            lastValue = exprValue;
+        }
     }
 }

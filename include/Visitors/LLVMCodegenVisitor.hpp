@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 
-// Forward declarations
+
 class NumberNode;
 class StringLiteralNode;
 class BooleanNode;
@@ -53,30 +53,33 @@ class AsNode;
 
 class LLVMCodegenVisitor {
 public:
-    // Cambiamos de objetos a referencias para evitar la copia
+
     llvm::LLVMContext &ctx;
     llvm::IRBuilder<> &builder;
     llvm::Module &module;
     llvm::Value* lastValue;
     
-    // Stack para variables locales
+
     std::vector<std::map<std::string, llvm::AllocaInst*>> localVarsStack;
     
-    // Map to track variable types for polymorphism
-    std::map<std::string, std::string> variableTypes;
 
-    // Constructor por defecto - creamos un nuevo contexto en lugar de usar getGlobalContext()
+    std::map<std::string, std::string> variableTypes;
+    
+
+    std::string currentTypeName;
+
+
     LLVMCodegenVisitor() : ctx(*new llvm::LLVMContext()),
                            builder(*new llvm::IRBuilder<>(ctx)),
                            module(*new llvm::Module("module", ctx)),
                            lastValue(nullptr) {}
 
-    // Constructor que toma referencias
+
     LLVMCodegenVisitor(llvm::LLVMContext& context, llvm::IRBuilder<>& b, llvm::Module& m);
 
     void visit(NumberNode& node);
     void visit(StringLiteralNode& node);
-    void visit(BooleanNode& node);    // Asegúrate de que esta declaración esté presente
+    void visit(BooleanNode& node);
     void visit(VariableNode& node);
     void visit(AdditionNode& node);
     void visit(SubtractionNode& node);
@@ -91,8 +94,8 @@ public:
     void visit(DefFuncNode& node);
     void visit(Program& node);
     void visit(LetExprNode& node);
-    void visit(BlockNode& node); // Añadir este método
-    void visit(ConditionalNode& node); // Add this method
+    void visit(BlockNode& node);
+    void visit(ConditionalNode& node);
     void visit(AndNode& node);
     void visit(OrNode& node);
     void visit(NotNode& node);
@@ -102,14 +105,14 @@ public:
     void visit(GreaterEqNode& node);
     void visit(LessNode& node);
     void visit(LessEqNode& node);
-    void visit(ModuloNode& node); // Added visit method for ModuloNode
+    void visit(ModuloNode& node);
     void visit(AssignmentNode& node);
     void visit(ExpressionStatementNode& node);
     void visit(WhileNode& node);
     void visit(BlockExprNode& node);
     void visit(ForRangeNode& node);
     void visit(TypeDefNode& node);
-    void visit(SelfMemberAccessNode& node); // Added visit method for self.attribute access
+    void visit(SelfMemberAccessNode& node);
     void visit(TypeInstantiationNode& node);
     void visit(MemberAccessNode& node);
     void visit(MethodCallNode& node);
@@ -117,5 +120,5 @@ public:
     void visit(AsNode& node);
 };
 
-#endif // LLVM_CODEGEN_VISITOR_HPP
+#endif
 

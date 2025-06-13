@@ -32,13 +32,13 @@ extern char* yytext;
     char* string;
     ExpressionNode* expression;
     StatementNode* statement;
-    ASTNode* ast_node; // Added for ast_construct
+    ASTNode* ast_node;
     std::vector<ExpressionNode*>* explist;
     std::vector<std::string>* idlist;
     std::vector<VarDeclPair>* decllist;
     std::vector<StatementNode*>* stmtlist;
     std::vector<Attribute>* attrlist;
-    std::vector<ASTNode*>* typemembers; // For type members (attributes and methods)
+    std::vector<ASTNode*>* typemembers;
     Type* type;
     Attribute* attribute;
 }
@@ -77,11 +77,11 @@ extern char* yytext;
 program:
     statement_list
     | expression SEMICOLON {
-        // Single expression as program entry point
+
         program.Statements.push_back(new ExpressionStatementNode($1));
     }
     | expression {
-        // Single expression as program entry point without semicolon
+
         program.Statements.push_back(new ExpressionStatementNode($1));
     }
     | { }
@@ -175,7 +175,7 @@ statement:
         delete $4;
     }
     | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type ARROW expression SEMICOLON {
-        // Function with typed parameters and return type
+
         std::vector<Parameter> params;
         for (const auto& pair : *$4) {
             params.emplace_back(pair.id, pair.type);
@@ -185,7 +185,7 @@ statement:
         free($2);
     }
     | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN ARROW expression SEMICOLON {
-        // Function with typed parameters but no return type
+
         std::vector<Parameter> params;
         for (const auto& pair : *$4) {
             params.emplace_back(pair.id, pair.type);
@@ -195,47 +195,47 @@ statement:
         free($2);
     }
     | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct SEMICOLON {
-        // Handle for loop as a statement
+
         if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
             if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-                // Create a ForRangeNode wrapped in an ExpressionStatementNode
+
                 ForRangeNode* forNode = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
                 $$ = new ExpressionStatementNode(forNode);
                 funcCall->args.clear();
                 delete funcCall;
                 free($3);
             } else {
-                // For other iterables, use the transpilation approach
-                $$ = new ExpressionStatementNode(new NumberNode(0)); // Placeholder
+
+                $$ = new ExpressionStatementNode(new NumberNode(0));
                 free($3);
             }
         } else {
-            $$ = new ExpressionStatementNode(new NumberNode(0)); // Placeholder
+            $$ = new ExpressionStatementNode(new NumberNode(0));
             free($3);
         }
     }
     | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct {
-        // Handle for loop as a statement without semicolon
+
         if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
             if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-                // Create a ForRangeNode wrapped in an ExpressionStatementNode
+
                 ForRangeNode* forNode = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
                 $$ = new ExpressionStatementNode(forNode);
                 funcCall->args.clear();
                 delete funcCall;
                 free($3);
             } else {
-                // For other iterables, use the transpilation approach
-                $$ = new ExpressionStatementNode(new NumberNode(0)); // Placeholder
+
+                $$ = new ExpressionStatementNode(new NumberNode(0));
                 free($3);
             }
         } else {
-            $$ = new ExpressionStatementNode(new NumberNode(0)); // Placeholder
+            $$ = new ExpressionStatementNode(new NumberNode(0));
             free($3);
         }
     }
     | TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE type_member_list RBRACE {
-        // Type definition with typed parameters and attributes
+
         std::vector<Parameter> params;
         for (const auto& pair : *$4) {
             params.emplace_back(pair.id, pair.type);
@@ -246,21 +246,21 @@ statement:
         free($2);
     }
     | TYPE IDENTIFIER LPAREN RPAREN LBRACE type_member_list RBRACE {
-        // Type definition with no parameters but with attributes
+
         std::vector<Parameter> params;
         $$ = new TypeDefNode($2, params, *$6);
         delete $6;
         free($2);
     }
     | TYPE IDENTIFIER LBRACE type_member_list RBRACE {
-        // Type definition without parameters and with attributes
+
         std::vector<Parameter> params;
         $$ = new TypeDefNode($2, params, *$4);
         delete $4;
         free($2);
     }
     | TYPE IDENTIFIER INHERITS IDENTIFIER LBRACE type_member_list RBRACE {
-        // Type definition with inheritance, no parameters
+
         std::vector<Parameter> params;
         std::vector<ExpressionNode*> parentArgs;
         $$ = new TypeDefNode($2, params, $4, parentArgs, *$6);
@@ -269,7 +269,7 @@ statement:
         free($4);
     }
     | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LBRACE type_member_list RBRACE {
-        // Type definition with parameters and inheritance, no parent args
+
         std::vector<Parameter> params;
         for (const auto& pair : *$4) {
             params.emplace_back(pair.id, pair.type);
@@ -282,7 +282,7 @@ statement:
         free($7);
     }
     | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LPAREN expression_list RPAREN LBRACE type_member_list RBRACE {
-        // Type definition with parameters and inheritance with parent args
+
         std::vector<Parameter> params;
         for (const auto& pair : *$4) {
             params.emplace_back(pair.id, pair.type);
@@ -295,7 +295,7 @@ statement:
         free($7);
     }
     | TYPE IDENTIFIER INHERITS IDENTIFIER LPAREN expression_list RPAREN LBRACE type_member_list RBRACE {
-        // Type definition with inheritance and parent args, no own parameters
+
         std::vector<Parameter> params;
         $$ = new TypeDefNode($2, params, $4, *$6, *$9);
         delete $6;
@@ -358,9 +358,9 @@ declaration:
         VarDeclPair pair;
         pair.id = $1;
         pair.expr = $3;
-        pair.type = Type::getUnknownType(); // Tipo desconocido, se inferirá
+        pair.type = Type::getUnknownType();
         $$->push_back(pair);
-        free($1); // Liberar memoria del char*
+        free($1);
     }
     | IDENTIFIER COLON type EQUALS expression {
         $$ = new std::vector<VarDeclPair>;
@@ -369,7 +369,7 @@ declaration:
         pair.expr = $5;
         pair.type = $3;
         $$->push_back(pair);
-        free($1); // Liberar memoria del char*
+        free($1);
     }
     ;
 
@@ -378,7 +378,7 @@ type:
     | TYPE_STRING { $$ = Type::getStringType(); }
     | TYPE_BOOLEAN { $$ = Type::getBooleanType(); }
     | IDENTIFIER {
-        // Look up user-defined type or Object
+
         Type* foundType = getTypeByName($1);
         $$ = foundType;
         free($1);
@@ -418,75 +418,75 @@ expression:
     | IDENTIFIER ASSIGN expression { $$ = new AssignmentNode($1, $3); free($1); }
     | IF expression ast_construct ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // $3 is ASTNode*
-            condNode->setElse($5);       // $5 is ASTNode*
+            condNode->addBranch($2, $3);
+            condNode->setElse($5);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // $3 is ASTNode*
-            condNode->setElse($6);       // $6 is ASTNode*
+            condNode->addBranch($2, $3);
+            condNode->setElse($6);
             $$ = condNode ;
         }
     | IF expression ast_construct ELSE EOL ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // $3 is ASTNode*
-            condNode->setElse($6);       // $6 is ASTNode*
+            condNode->addBranch($2, $3);
+            condNode->setElse($6);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELSE EOL ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // $3 is ASTNode*
-            condNode->setElse($7);       // $7 is ASTNode*
+            condNode->addBranch($2, $3);
+            condNode->setElse($7);
             $$ = condNode ;
         }
     | IF expression ast_construct ELIF expression ast_construct ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($5, $6); // elif branch
-            condNode->setElse($8);       // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($5, $6);
+            condNode->setElse($8);
             $$ = condNode ;
         }
     | IF expression ast_construct ELIF expression ast_construct EOL ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($5, $6); // elif branch
-            condNode->setElse($9);       // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($5, $6);
+            condNode->setElse($9);
             $$ = condNode ;
         }
     | IF expression ast_construct ELIF expression ast_construct ELSE EOL ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($5, $6); // elif branch
-            condNode->setElse($9);       // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($5, $6);
+            condNode->setElse($9);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELIF expression ast_construct ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($6, $7); // elif branch
-            condNode->setElse($9);       // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($6, $7);
+            condNode->setElse($9);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELIF expression ast_construct EOL ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($6, $7); // elif branch
-            condNode->setElse($10);      // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($6, $7);
+            condNode->setElse($10);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELIF expression ast_construct ELSE EOL ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($6, $7); // elif branch
-            condNode->setElse($10);      // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($6, $7);
+            condNode->setElse($10);
             $$ = condNode ;
         }
     | IF expression ast_construct EOL ELIF expression ast_construct EOL ELSE EOL ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3); // if branch
-            condNode->addBranch($6, $7); // elif branch
-            condNode->setElse($11);      // else branch
+            condNode->addBranch($2, $3);
+            condNode->addBranch($6, $7);
+            condNode->setElse($11);
             $$ = condNode ;
         }
 
@@ -497,18 +497,18 @@ expression:
     | WHILE LPAREN expression RPAREN ast_construct { $$ = new WhileNode($3, $5); }
     | WHILE expression ast_construct { $$ = new WhileNode($2, $3); }
     | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct {
-        // Check if the expression is a range function call
+
         if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
             if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-                // Create a ForRangeNode for range-based for loops
+
                 $$ = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
-                // Don't delete the args as ForRangeNode now owns them
+
                 funcCall->args.clear();
                 delete funcCall;
                 free($3);
             } else {
-                // For other iterables, use the original transpilation approach
-                // (keeping the original code for future extension)
+
+
                 std::string iterableVar = std::string("_iterable_") + $3;
 
                 ExpressionNode* nextCall = new FuncCallNode("next", {new VariableNode(iterableVar.c_str())});
@@ -541,7 +541,7 @@ expression:
                 free($3);
             }
         } else {
-            // If it's not a function call, use the original approach
+
             std::string iterableVar = std::string("_iterable_") + $3;
 
             ExpressionNode* nextCall = new FuncCallNode("next", {new VariableNode(iterableVar.c_str())});
@@ -583,12 +583,12 @@ expression:
 postfix_expression:
     primary_expression { $$ = $1; }
     | postfix_expression DOT IDENTIFIER {
-        // Check if the left side is a 'self' variable reference
+
         if (auto varNode = dynamic_cast<VariableNode*>($1)) {
             if (varNode->identifier == "self") {
-                // Create SelfMemberAccessNode for self.member
+
                 $$ = new SelfMemberAccessNode($3);
-                delete varNode; // Clean up the VariableNode since we're not using it
+                delete varNode;
             } else {
                 $$ = new MemberAccessNode($1, $3);
             }
@@ -681,8 +681,8 @@ parameter:
         $$ = new std::vector<VarDeclPair>;
         VarDeclPair pair;
         pair.id = $1;
-        pair.expr = nullptr; // Parameters don't have expressions
-        pair.type = nullptr; // Untyped parameter
+        pair.expr = nullptr;
+        pair.type = nullptr;
         $$->push_back(pair);
         free($1);
     }
@@ -690,7 +690,7 @@ parameter:
         $$ = new std::vector<VarDeclPair>;
         VarDeclPair pair;
         pair.id = $1;
-        pair.expr = nullptr; // Parameters don't have expressions
+        pair.expr = nullptr;
         pair.type = $3;
         $$->push_back(pair);
         free($1);

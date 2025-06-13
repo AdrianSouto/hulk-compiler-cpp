@@ -1,268 +1,375 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Expressions/FuncCallNode.hpp"
 #include "Expressions/BaseCallNode.hpp"
+#include "Expressions/ConcatenationNode.hpp"
 #include "Statements/DefFuncNode.hpp"
+#include "Statements/TypeDefNode.hpp"
+#include "Globals.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Verifier.h>
+#include <iostream>
 
+static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
+    if (typeName == "Number") {
+        return llvm::Type::getDoubleTy(ctx);
+    } else if (typeName == "String") {
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+    } else if (typeName == "Boolean") {
+        return llvm::Type::getInt1Ty(ctx);
+    } else if (typeName == "Object") {
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+    } else if (typeName == "Void" || typeName.empty()) {
+        return llvm::Type::getVoidTy(ctx);
+    }
+
+    return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+}
 
 static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::Type* type, const std::string& varName) {
     llvm::IRBuilder<> tmpB(&function->getEntryBlock(), function->getEntryBlock().begin());
     return tmpB.CreateAlloca(type, nullptr, varName);
 }
 
-void LLVMCodegenVisitor::visit(FuncCallNode& node) {
+void LLVMCodegenVisitor::visit(DefFuncNode& node) {
+
+    std::vector<llvm::Type*> paramTypes;
+    for (const auto& param : node.parameters) {
+        std::string typeName = "Number";
+        if (param.type) {
+            typeName = param.type->toString();
+        }
+        llvm::Type* paramType = getLLVMTypeFromName(typeName, ctx);
+        
+
+        if (param.name == "self" && !currentTypeName.empty()) {
+
+            paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+            std::cerr << "DEBUG: Setting 'self' parameter type to pointer for type '" << currentTypeName << "'" << std::endl;
+        }
+        
+        paramTypes.push_back(paramType);
+    }
     
-    if (node.identifier == "sqrt" || node.identifier == "sin" || node.identifier == "cos") {
-        if (node.args.size() != 1) {
+
+    llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
+    if (node.returnType) {
+        returnType = getLLVMTypeFromName(node.returnType->toString(), ctx);
+    } else {
+
+
+        if (node.expr) {
+
+            if (dynamic_cast<ConcatenationNode*>(node.expr)) {
+                returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                std::cerr << "DEBUG: Inferred return type as String for function '" << node.identifier << "'" << std::endl;
+            }
+        }
+    }
+    
+
+    llvm::FunctionType* funcType = llvm::FunctionType::get(returnType, paramTypes, false);
+    
+
+    llvm::Function* function = llvm::Function::Create(
+        funcType, 
+        llvm::Function::ExternalLinkage, 
+        node.identifier, 
+        module
+    );
+    
+
+    if (module.getFunction(node.identifier) && module.getFunction(node.identifier) != function) {
+        function->eraseFromParent();
+        std::cerr << "Error: Function '" << node.identifier << "' already defined" << std::endl;
+        lastValue = nullptr;
+        return;
+    }
+    
+
+    llvm::BasicBlock* entryBB = llvm::BasicBlock::Create(ctx, "entry", function);
+    
+
+    llvm::BasicBlock* prevBB = builder.GetInsertBlock();
+    
+
+    builder.SetInsertPoint(entryBB);
+    
+
+    localVarsStack.push_back(std::map<std::string, llvm::AllocaInst*>());
+    
+
+    auto argIt = function->arg_begin();
+    for (size_t i = 0; i < node.parameters.size(); ++i, ++argIt) {
+        llvm::Argument* arg = &*argIt;
+        arg->setName(node.parameters[i].name);
+        
+
+        llvm::AllocaInst* alloca = createEntryBlockAlloca(function, arg->getType(), node.parameters[i].name);
+        
+
+        builder.CreateStore(arg, alloca);
+        
+
+        localVarsStack.back()[node.parameters[i].name] = alloca;
+    }
+    
+
+    node.expr->accept(*this);
+    llvm::Value* returnValue = lastValue;
+    
+
+    if (returnValue) {
+        if (returnType->isVoidTy()) {
+            builder.CreateRetVoid();
+        } else {
+
+            if (returnValue->getType() != returnType) {
+                if (returnValue->getType()->isIntegerTy() && returnType->isDoubleTy()) {
+                    returnValue = builder.CreateSIToFP(returnValue, returnType, "int_to_double");
+                } else if (returnValue->getType()->isDoubleTy() && returnType->isIntegerTy()) {
+                    returnValue = builder.CreateFPToSI(returnValue, returnType, "double_to_int");
+                } else if (returnValue->getType()->isPointerTy() && returnType->isPointerTy()) {
+                    returnValue = builder.CreateBitCast(returnValue, returnType, "ptr_cast");
+                }
+            }
+            builder.CreateRet(returnValue);
+        }
+    } else {
+        if (returnType->isVoidTy()) {
+            builder.CreateRetVoid();
+        } else {
+
+            llvm::Value* defaultRet = nullptr;
+            if (returnType->isDoubleTy()) {
+                defaultRet = llvm::ConstantFP::get(returnType, 0.0);
+            } else if (returnType->isIntegerTy()) {
+                defaultRet = llvm::ConstantInt::get(returnType, 0);
+            } else if (returnType->isPointerTy()) {
+                defaultRet = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(returnType));
+            }
+            builder.CreateRet(defaultRet);
+        }
+    }
+    
+
+    localVarsStack.pop_back();
+    
+
+    if (llvm::verifyFunction(*function, &llvm::errs())) {
+        std::cerr << "Error: Function verification failed for '" << node.identifier << "'" << std::endl;
+        function->eraseFromParent();
+        lastValue = nullptr;
+    } else {
+        lastValue = function;
+    }
+    
+
+    if (prevBB) {
+        builder.SetInsertPoint(prevBB);
+    }
+}
+
+void LLVMCodegenVisitor::visit(FuncCallNode& node) {
+
+    if (node.identifier == "sqrt" || node.identifier == "sin" || node.identifier == "cos" || 
+        node.identifier == "exp" || node.identifier == "log" || node.identifier == "pow") {
+        
+        llvm::Type* doubleTy = llvm::Type::getDoubleTy(ctx);
+        std::vector<llvm::Value*> args;
+        
+
+        for (auto arg : node.args) {
+            arg->accept(*this);
+            llvm::Value* argVal = lastValue;
+            
+            if (!argVal) {
+                lastValue = nullptr;
+                return;
+            }
+            
+
+            if (argVal->getType()->isIntegerTy()) {
+                argVal = builder.CreateSIToFP(argVal, doubleTy, "arg_to_double");
+            } else if (argVal->getType()->isIntegerTy(1)) {
+                llvm::Value* intVal = builder.CreateZExt(argVal, llvm::Type::getInt32Ty(ctx));
+                argVal = builder.CreateSIToFP(intVal, doubleTy, "bool_to_double");
+            }
+            
+            args.push_back(argVal);
+        }
+        
+
+        if ((node.identifier == "sqrt" || node.identifier == "sin" || node.identifier == "cos" ||
+             node.identifier == "exp" || node.identifier == "log") && args.size() != 1) {
+            std::cerr << "Error: " << node.identifier << " expects 1 argument" << std::endl;
             lastValue = nullptr;
             return;
         }
         
+        if (node.identifier == "pow" && args.size() != 2) {
+            std::cerr << "Error: pow expects 2 arguments" << std::endl;
+            lastValue = nullptr;
+            return;
+        }
         
-        node.args[0]->accept(*this);
-        llvm::Value* arg = lastValue;
-        
-        
-        llvm::Type* doubleTy = llvm::Type::getDoubleTy(ctx);
-        llvm::Value* argDouble = builder.CreateSIToFP(arg, doubleTy, "argtodbl");
-        
-        
+
         llvm::Function* mathFunc = nullptr;
+        std::string intrinsicName;
+        
         if (node.identifier == "sqrt") {
-            mathFunc = module.getFunction("llvm.sqrt.f64");
-            if (!mathFunc) {
-                llvm::FunctionType* sqrtType = llvm::FunctionType::get(doubleTy, {doubleTy}, false);
-                mathFunc = llvm::Function::Create(sqrtType, llvm::Function::ExternalLinkage, "llvm.sqrt.f64", module);
-            }
+            intrinsicName = "llvm.sqrt.f64";
         } else if (node.identifier == "sin") {
-            mathFunc = module.getFunction("llvm.sin.f64");
-            if (!mathFunc) {
-                llvm::FunctionType* sinType = llvm::FunctionType::get(doubleTy, {doubleTy}, false);
-                mathFunc = llvm::Function::Create(sinType, llvm::Function::ExternalLinkage, "llvm.sin.f64", module);
-            }
+            intrinsicName = "llvm.sin.f64";
         } else if (node.identifier == "cos") {
-            mathFunc = module.getFunction("llvm.cos.f64");
-            if (!mathFunc) {
-                llvm::FunctionType* cosType = llvm::FunctionType::get(doubleTy, {doubleTy}, false);
-                mathFunc = llvm::Function::Create(cosType, llvm::Function::ExternalLinkage, "llvm.cos.f64", module);
+            intrinsicName = "llvm.cos.f64";
+        } else if (node.identifier == "exp") {
+            intrinsicName = "llvm.exp.f64";
+        } else if (node.identifier == "log") {
+            intrinsicName = "llvm.log.f64";
+        } else if (node.identifier == "pow") {
+            intrinsicName = "llvm.pow.f64";
+        }
+        
+        mathFunc = module.getFunction(intrinsicName);
+        if (!mathFunc) {
+            std::vector<llvm::Type*> paramTypes;
+            if (node.identifier == "pow") {
+                paramTypes = {doubleTy, doubleTy};
+            } else {
+                paramTypes = {doubleTy};
             }
+            
+            llvm::FunctionType* funcType = llvm::FunctionType::get(doubleTy, paramTypes, false);
+            mathFunc = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, intrinsicName, module);
         }
         
         if (mathFunc) {
-            llvm::Value* result = builder.CreateCall(mathFunc, {argDouble}, node.identifier + "tmp");
-            
-            lastValue = builder.CreateFPToSI(result, llvm::Type::getInt32Ty(ctx), node.identifier + "int");
+            lastValue = builder.CreateCall(mathFunc, args, node.identifier + "_result");
         } else {
             lastValue = nullptr;
         }
         return;
     }
     
-    
+
     llvm::Function* callee = module.getFunction(node.identifier);
     if (!callee) {
+        std::cerr << "Error: Unknown function '" << node.identifier << "'" << std::endl;
         lastValue = nullptr;
         return;
     }
-    std::vector<llvm::Value*> argsV;
-    for (auto arg : node.args) {
-        arg->accept(*this);
-        argsV.push_back(lastValue);
+    
+
+    if (callee->arg_size() != node.args.size()) {
+        std::cerr << "Error: Function '" << node.identifier << "' expects " 
+                  << callee->arg_size() << " arguments, got " << node.args.size() << std::endl;
+        lastValue = nullptr;
+        return;
     }
-    lastValue = builder.CreateCall(callee, argsV, callee->getReturnType()->isVoidTy() ? "" : "calltmp");
+    
+
+    std::vector<llvm::Value*> argsV;
+    auto paramIt = callee->arg_begin();
+    
+    for (size_t i = 0; i < node.args.size(); ++i, ++paramIt) {
+        node.args[i]->accept(*this);
+        llvm::Value* argVal = lastValue;
+        
+        if (!argVal) {
+            lastValue = nullptr;
+            return;
+        }
+        
+
+        llvm::Type* expectedType = paramIt->getType();
+        if (argVal->getType() != expectedType) {
+            if (argVal->getType()->isIntegerTy() && expectedType->isDoubleTy()) {
+                argVal = builder.CreateSIToFP(argVal, expectedType, "arg_int_to_double");
+            } else if (argVal->getType()->isDoubleTy() && expectedType->isIntegerTy()) {
+                argVal = builder.CreateFPToSI(argVal, expectedType, "arg_double_to_int");
+            } else if (argVal->getType()->isIntegerTy(1) && expectedType->isIntegerTy()) {
+                argVal = builder.CreateZExt(argVal, expectedType, "arg_bool_to_int");
+            } else if (argVal->getType()->isIntegerTy(1) && expectedType->isDoubleTy()) {
+                llvm::Value* intVal = builder.CreateZExt(argVal, llvm::Type::getInt32Ty(ctx));
+                argVal = builder.CreateSIToFP(intVal, expectedType, "arg_bool_to_double");
+            } else if (argVal->getType()->isPointerTy() && expectedType->isPointerTy()) {
+                argVal = builder.CreateBitCast(argVal, expectedType, "arg_ptr_cast");
+            }
+        }
+        
+        argsV.push_back(argVal);
+    }
+    
+
+    lastValue = builder.CreateCall(callee, argsV, callee->getReturnType()->isVoidTy() ? "" : "call_result");
 }
 
 void LLVMCodegenVisitor::visit(BaseCallNode& node) {
+
+
     
+
+    llvm::Value* selfPtr = nullptr;
+    std::string currentTypeName = "";
     
-    
-    
-    
-    
-    
-    llvm::Function* currentFunc = builder.GetInsertBlock()->getParent();
-    std::string currentFuncName = currentFunc->getName().str();
-    
-    
-    size_t underscorePos = currentFuncName.find('_');
-    if (underscorePos == std::string::npos) {
-        
-        lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-        return;
-    }
-    
-    std::string currentTypeName = currentFuncName.substr(0, underscorePos);
-    std::string methodName = currentFuncName.substr(underscorePos + 1);
-    
-    
-    std::string parentTypeName;
-    if (currentTypeName == "Knight") {
-        parentTypeName = "Person";
-    } else if (currentTypeName == "SuperKnight") {
-        parentTypeName = "Knight";
-    } else if (currentTypeName == "Paladin") {
-        parentTypeName = "Knight";
-    } else if (currentTypeName == "Archmage") {
-        parentTypeName = "Wizard";
-    } else if (currentTypeName == "Wizard") {
-        parentTypeName = "Person";
-    } else if (currentTypeName == "PolarPoint") {
-        parentTypeName = "Point";
-    } else if (currentTypeName == "AdvancedPolarPoint") {
-        parentTypeName = "PolarPoint";
-    } else if (currentTypeName == "SuperAdvancedPoint") {
-        parentTypeName = "AdvancedPolarPoint";
-    } else {
-        
-        lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-        return;
-    }
-    
-    
-    std::string parentMethodName = parentTypeName + "_" + methodName;
-    llvm::Function* parentMethod = module.getFunction(parentMethodName);
-    
-    if (!parentMethod) {
-        
-        lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-        return;
-    }
-    
-    
-    std::vector<llvm::Value*> args;
-    
-    
-    llvm::AllocaInst* selfAlloca = nullptr;
+
     for (auto it = localVarsStack.rbegin(); it != localVarsStack.rend(); ++it) {
-        auto found = it->find("self");
-        if (found != it->end()) {
-            selfAlloca = found->second;
+        auto selfIt = it->find("self");
+        if (selfIt != it->end()) {
+            selfPtr = builder.CreateLoad(selfIt->second->getAllocatedType(), selfIt->second, "self");
             break;
         }
     }
     
-    if (selfAlloca) {
-        llvm::Value* selfPtr = builder.CreateLoad(selfAlloca->getAllocatedType(), selfAlloca, "self_ptr");
-        args.push_back(selfPtr);
-    } else {
-        
-        lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
+    if (!selfPtr) {
+        std::cerr << "Error: 'self' not found in current context for base() call" << std::endl;
+        lastValue = nullptr;
         return;
     }
     
-    
-    for (auto arg : node.args) {
-        arg->accept(*this);
-        args.push_back(lastValue);
-    }
-    
-    
-    lastValue = builder.CreateCall(parentMethod, args, "base_call");
-}
 
-void LLVMCodegenVisitor::visit(DefFuncNode& node) {
-    
-    
-    llvm::Type* returnType = llvm::Type::getInt32Ty(ctx); 
-    
-    
-    if (node.identifier == "concat" || node.identifier == "name" || 
-        node.identifier == "introduce" || node.identifier == "study" || 
-        node.identifier == "teach" || node.identifier == "fullIntro") {
-        returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-    }
-    
-    
-    std::vector<llvm::Type*> argTypes;
-    for (const auto& param : node.parameters) {
-        argTypes.push_back(llvm::Type::getInt32Ty(ctx)); 
-    }
-    llvm::FunctionType* funcType = llvm::FunctionType::get(
-        returnType, argTypes, false);
 
-    llvm::Function* function = llvm::Function::Create(
-        funcType, llvm::Function::ExternalLinkage, node.identifier, module);
-
+    llvm::Function* currentFunc = builder.GetInsertBlock()->getParent();
+    std::string funcName = currentFunc->getName().str();
     
-    llvm::BasicBlock* entry = llvm::BasicBlock::Create(ctx, "entry", function);
-    llvm::BasicBlock* savedBlock = builder.GetInsertBlock();
-    llvm::BasicBlock::iterator savedPoint = builder.GetInsertPoint();
-    builder.SetInsertPoint(entry);
 
-    
-    localVarsStack.push_back(std::map<std::string, llvm::AllocaInst*>());
-
-    
-    unsigned idx = 0;
-    for (auto& arg : function->args()) {
-        arg.setName(node.parameters[idx].name);
-        llvm::AllocaInst* alloca = createEntryBlockAlloca(function, arg.getType(), node.parameters[idx].name);
-        builder.CreateStore(&arg, alloca);
-        localVarsStack.back()[node.parameters[idx].name] = alloca;
-        ++idx;
-    }
-
-    
-    node.expr->accept(*this);
-
-    
-    if (lastValue) {
+    size_t underscorePos = funcName.find('_');
+    if (underscorePos != std::string::npos) {
+        currentTypeName = funcName.substr(0, underscorePos);
+        std::string methodName = funcName.substr(underscorePos + 1);
         
-        if (lastValue->getType() != returnType) {
+
+        auto typeIt = types.find(currentTypeName);
+        if (typeIt != types.end() && !typeIt->second->parentTypeName.empty()) {
+            std::string parentTypeName = typeIt->second->parentTypeName;
+            std::string parentMethodName = parentTypeName + "_" + methodName;
             
-            if (returnType == llvm::Type::getInt32Ty(ctx) && lastValue->getType()->isPointerTy()) {
+
+            llvm::Function* parentMethod = module.getFunction(parentMethodName);
+            if (parentMethod) {
+
+                std::vector<llvm::Value*> args;
+                args.push_back(selfPtr);
                 
-                lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-            } else if (returnType->isPointerTy() && lastValue->getType() == llvm::Type::getInt32Ty(ctx)) {
-                
-                llvm::Function* mallocFunc = module.getFunction("malloc");
-                if (!mallocFunc) {
-                    llvm::FunctionType* mallocType = llvm::FunctionType::get(
-                        llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
-                        {llvm::Type::getInt64Ty(ctx)},
-                        false
-                    );
-                    mallocFunc = llvm::Function::Create(
-                        mallocType,
-                        llvm::Function::ExternalLinkage,
-                        "malloc",
-                        module
-                    );
+                for (auto arg : node.args) {
+                    arg->accept(*this);
+                    if (lastValue) {
+                        args.push_back(lastValue);
+                    }
                 }
                 
-                llvm::Value* bufSize = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), 32);
-                llvm::Value* bufPtr = builder.CreateCall(mallocFunc, {bufSize}, "int_to_str_buf");
-                
-                llvm::FunctionType* sprintfType = llvm::FunctionType::get(
-                    llvm::Type::getInt32Ty(ctx),
-                    {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
-                    true
-                );
-                llvm::FunctionCallee sprintfFunc = module.getOrInsertFunction("sprintf", sprintfType);
-                
-                llvm::Value* formatStr = builder.CreateGlobalStringPtr("%d");
-                builder.CreateCall(sprintfFunc, {bufPtr, formatStr, lastValue});
-                lastValue = bufPtr;
+
+                lastValue = builder.CreateCall(parentMethod, args, "base_call_result");
+                return;
             }
         }
-        builder.CreateRet(lastValue);
-    } else {
-        
-        if (returnType->isPointerTy()) {
-            builder.CreateRet(builder.CreateGlobalStringPtr(""));
-        } else {
-            builder.CreateRet(llvm::ConstantInt::get(returnType, 0));
-        }
     }
-
     
-    localVarsStack.pop_back();
 
-    
-    builder.SetInsertPoint(savedBlock, savedPoint);
-
-    lastValue = nullptr;
+    std::cerr << "Warning: Could not resolve base() call for type " << currentTypeName << std::endl;
+    lastValue = builder.CreateGlobalStringPtr("");
 }

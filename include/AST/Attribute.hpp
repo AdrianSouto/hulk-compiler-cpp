@@ -38,4 +38,4 @@ public:
 
 };
 
-#endif // ATTRIBUTE_HPP
+#endif
