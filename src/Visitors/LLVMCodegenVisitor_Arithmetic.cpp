@@ -15,7 +15,7 @@ void LLVMCodegenVisitor::visit(AdditionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    
+
 
     if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
 
@@ -41,7 +41,7 @@ void LLVMCodegenVisitor::visit(SubtractionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    
+
 
     if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
 
@@ -67,7 +67,7 @@ void LLVMCodegenVisitor::visit(MultiplicationNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    
+
 
     if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
 
@@ -93,7 +93,7 @@ void LLVMCodegenVisitor::visit(DivisionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    
+
 
     if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
 
@@ -141,8 +141,8 @@ void LLVMCodegenVisitor::visit(ModuloNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    
-    
+
+
     llvm::Function* function = builder.GetInsertBlock()->getParent();
     llvm::BasicBlock* originalBlock = builder.GetInsertBlock();
     llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(ctx, "mod.notzero", function);
@@ -153,21 +153,21 @@ void LLVMCodegenVisitor::visit(ModuloNode& node) {
     llvm::Value* cond = builder.CreateICmpNE(r, zero, "isNotZero");
     builder.CreateCondBr(cond, thenBlock, elseBlock);
 
-    builder.SetInsert(thenBlock);
+    builder.SetInsertPoint(thenBlock);
     llvm::Value* resultNonZero = builder.CreateSRem(l, r, "modtmp");
     builder.CreateBr(mergeBlock);
-    thenBlock = builder.GetInsertBlock(); 
+    thenBlock = builder.GetInsertBlock();
 
-    builder.SetInsert(elseBlock);
-    
-    
-    llvm::Value* resultZero = llvm::ConstantInt::get(l->getType(), 0, true); 
-    
-    
+    builder.SetInsertPoint(elseBlock);
+
+
+    llvm::Value* resultZero = llvm::ConstantInt::get(l->getType(), 0, true);
+
+
     builder.CreateBr(mergeBlock);
-    elseBlock = builder.GetInsertBlock(); 
+    elseBlock = builder.GetInsertBlock();
 
-    builder.SetInsert(mergeBlock);
+    builder.SetInsertPoint(mergeBlock);
     llvm::PHINode* phi = builder.CreatePHI(l->getType(), 2, "modresult");
     phi->addIncoming(resultNonZero, thenBlock);
     phi->addIncoming(resultZero, elseBlock);

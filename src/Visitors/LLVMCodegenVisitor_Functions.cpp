@@ -17,16 +17,16 @@ static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMCo
     if (typeName == "Number") {
         return llvm::Type::getInt32Ty(ctx);
     } else if (typeName == "String") {
-        return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Boolean") {
         return llvm::Type::getInt1Ty(ctx);
     } else if (typeName == "Object") {
-        return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Void" || typeName.empty()) {
         return llvm::Type::getVoidTy(ctx);
     }
 
-    return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
+    return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
 }
 
 static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::Type* type, const std::string& varName) {
@@ -47,7 +47,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
 
         if (param.name == "self" && !currentTypeName.empty()) {
 
-            paramType = llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
+            paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
             std::cerr << "DEBUG: Setting 'self' parameter type to er for type '" << currentTypeName << "'" << std::endl;
         }
         
@@ -63,7 +63,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
         if (node.expr) {
 
             if (dynamic_cast<ConcatenationNode*>(node.expr)) {
-                returnType = llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
+                returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
                 std::cerr << "DEBUG: Inferred return type as String for function '" << node.identifier << "'" << std::endl;
             }
         }
@@ -95,7 +95,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
     llvm::BasicBlock* prevBB = builder.GetInsertBlock();
     
 
-    builder.SetInsert(entryBB);
+    builder.SetInsertPoint(entryBB);
     
 
     localVarsStack.push_back(std::map<std::string, llvm::AllocaInst*>());
@@ -134,7 +134,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
                     } else if (returnValue->getType()->getIntegerBitWidth() > returnType->getIntegerBitWidth()) {
                         returnValue = builder.CreateTrunc(returnValue, returnType, "int_trunc");
                     }
-                } else if (returnValue->getType()->iserTy() && returnType->iserTy()) {
+                } else if (returnValue->getType()->isPointerTy() && returnType->isPointerTy()) {
                     returnValue = builder.CreateBitCast(returnValue, returnType, "ptr_cast");
                 }
             }
@@ -148,8 +148,8 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
             llvm::Value* defaultRet = nullptr;
             if (returnType->isIntegerTy()) {
                 defaultRet = llvm::ConstantInt::get(returnType, 0);
-            } else if (returnType->iserTy()) {
-                defaultRet = llvm::ConstanterNull::get(llvm::cast<llvm::erType>(returnType));
+            } else if (returnType->isPointerTy()) {
+                defaultRet = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(returnType));
             }
             builder.CreateRet(defaultRet);
         }
@@ -169,7 +169,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
     
 
     if (prevBB) {
-        builder.SetInsert(prevBB);
+        builder.SetInsertPoint(prevBB);
     }
 }
 
@@ -296,7 +296,7 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
                 } else if (argVal->getType()->getIntegerBitWidth() > expectedType->getIntegerBitWidth()) {
                     argVal = builder.CreateTrunc(argVal, expectedType, "arg_int_trunc");
                 }
-            } else if (argVal->getType()->iserTy() && expectedType->iserTy()) {
+            } else if (argVal->getType()->isPointerTy() && expectedType->isPointerTy()) {
                 argVal = builder.CreateBitCast(argVal, expectedType, "arg_ptr_cast");
             }
         }

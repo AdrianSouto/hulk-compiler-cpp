@@ -162,7 +162,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
                 llvm::StructType* structType = structIt->second;
                 
 
-                llvm::Value* typedSelfPtr = builder.CreateBitCast(selfPtr, llvm::erType::get(structType, 0), "typed_self");
+                llvm::Value* typedSelfPtr = builder.CreateBitCast(selfPtr, llvm::PointerType::get(structType, 0), "typed_self");
                 
 
                 llvm::Value* memberPtr = builder.CreateStructGEP(structType, typedSelfPtr, attrIndex, "member_ptr");

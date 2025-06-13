@@ -28,7 +28,7 @@ void LLVMCodegenVisitor::visit(PrintStatementNode& node) {
     llvm::Function* printfFunc = module.getFunction("printf");
     if (!printfFunc) {
         std::vector<llvm::Type*> printfArgs;
-        printfArgs.push_back(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
+        printfArgs.push_back(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
         llvm::FunctionType* printfType = llvm::FunctionType::get(
             llvm::Type::getInt32Ty(ctx), printfArgs, true);
         printfFunc = llvm::Function::Create(
@@ -38,7 +38,7 @@ void LLVMCodegenVisitor::visit(PrintStatementNode& node) {
 
     llvm::Value* formatStr;
 
-    if (val->getType()->iserTy()) {
+    if (val->getType()->isPointerTy()) {
 
         formatStr = builder.CreateGlobalStringPtr("%s\n");
     } else if (val->getType()->isIntegerTy(1)) {
@@ -131,7 +131,7 @@ void LLVMCodegenVisitor::visit(Program& node) {
 
 
     llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(ctx, "entry", mainFunc);
-    builder.SetInsert(entryBlock);
+    builder.SetInsertPoint(entryBlock);
 
 
 
@@ -152,7 +152,7 @@ void LLVMCodegenVisitor::visit(Program& node) {
         }
     } else {
         if (entryBlock->getTerminator() == nullptr) {
-            builder.SetInsert(entryBlock);
+            builder.SetInsertPoint(entryBlock);
             builder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0, true));
         }
     }

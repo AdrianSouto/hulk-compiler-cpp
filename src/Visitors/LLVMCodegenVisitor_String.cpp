@@ -13,14 +13,14 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
     llvm::Value* rightValue = lastValue;
     
 
-    bool leftIsString = leftValue->getType()->iserTy();
-    bool rightIsString = rightValue->getType()->iserTy();
+    bool leftIsString = leftValue->getType()->isPointerTy();
+    bool rightIsString = rightValue->getType()->isPointerTy();
     
 
     llvm::Function* mallocFunc = module.getFunction("malloc");
     if (!mallocFunc) {
         llvm::FunctionType* mallocType = llvm::FunctionType::get(
-            llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0),
+            llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
             {llvm::Type::getInt64Ty(ctx)},
             false
         );
@@ -37,22 +37,22 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
     
     llvm::FunctionType* sprintfType = llvm::FunctionType::get(
         llvm::Type::getInt32Ty(ctx),
-        {llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
         true
     );
     llvm::FunctionCallee sprintfFunc = module.getOrInsertFunction("sprintf", sprintfType);
     
 
     llvm::FunctionType* strcpyType = llvm::FunctionType::get(
-        llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0),
-        {llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
         false
     );
     llvm::FunctionCallee strcpyFunc = module.getOrInsertFunction("strcpy", strcpyType);
     
     llvm::FunctionType* strcatType = llvm::FunctionType::get(
-        llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0),
-        {llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
         false
     );
     llvm::FunctionCallee strcatFunc = module.getOrInsertFunction("strcat", strcatType);
@@ -108,7 +108,7 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
         if (!freeFunc) {
             llvm::FunctionType* freeType = llvm::FunctionType::get(
                 llvm::Type::getVoidTy(ctx),
-                {llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0)},
+                {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
                 false
             );
             freeFunc = llvm::Function::Create(
