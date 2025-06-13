@@ -210,19 +210,26 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     ++argIt;
                 } else {
 
-                    std::string attrTypeName = "Number";
-                    if (parentTypeDef->attributes[i].type) {
-                        attrTypeName = parentTypeDef->attributes[i].type->toString();
-                    }
-                    
-                    if (attrTypeName == "Number") {
-                        initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-                    } else if (attrTypeName == "Boolean") {
-                        initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
-                    } else if (attrTypeName == "String") {
-                        initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                    if (parentTypeDef->attributes[i].hasInitExpression()) {
+
+                        parentTypeDef->attributes[i].initExpression->accept(*this);
+                        initValue = lastValue;
                     } else {
-                        initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+
+                        std::string attrTypeName = "Number";
+                        if (parentTypeDef->attributes[i].type) {
+                            attrTypeName = parentTypeDef->attributes[i].type->toString();
+                        }
+                        
+                        if (attrTypeName == "Number") {
+                            initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
+                        } else if (attrTypeName == "Boolean") {
+                            initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
+                        } else if (attrTypeName == "String") {
+                            initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                        } else {
+                            initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                        }
                     }
                 }
                 
@@ -244,19 +251,26 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             ++argIt;
         } else {
 
-            std::string attrTypeName = "Number";
-            if (node.attributes[i].type) {
-                attrTypeName = node.attributes[i].type->toString();
-            }
-            
-            if (attrTypeName == "Number") {
-                initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
-            } else if (attrTypeName == "Boolean") {
-                initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
-            } else if (attrTypeName == "String") {
-                initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+            if (node.attributes[i].hasInitExpression()) {
+
+                node.attributes[i].initExpression->accept(*this);
+                initValue = lastValue;
             } else {
-                initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+
+                std::string attrTypeName = "Number";
+                if (node.attributes[i].type) {
+                    attrTypeName = node.attributes[i].type->toString();
+                }
+                
+                if (attrTypeName == "Number") {
+                    initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
+                } else if (attrTypeName == "Boolean") {
+                    initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
+                } else if (attrTypeName == "String") {
+                    initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                } else {
+                    initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                }
             }
         }
         
@@ -325,8 +339,8 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
 
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
 
-    
 
+    
     llvm::Value* selfPtr = nullptr;
     
 
@@ -493,7 +507,6 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
     std::vector<std::string> typesToTry;
     if (!objTypeName.empty()) {
         typesToTry.push_back(objTypeName);
-        
 
         auto typeIt = types.find(objTypeName);
         if (typeIt != types.end() && !typeIt->second->parentTypeName.empty()) {
