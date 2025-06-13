@@ -22,6 +22,8 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Expressions/AdditionNode.cpp \
               src/Expressions/AndNode.cpp \
               src/Expressions/AssignmentNode.cpp \
+              src/Expressions/MemberAssignmentNode.cpp \
+              src/Expressions/SelfMemberAssignmentNode.cpp \
               src/Expressions/BinaryOperatorNode.cpp \
               src/Expressions/BlockExprNode.cpp \
               src/Expressions/BooleanNode.cpp \

@@ -416,6 +416,17 @@ expression:
     | expression OR expression { $$ = new OrNode($1, $3); }
     | NOT expression { $$ = new NotNode($2); }
     | IDENTIFIER ASSIGN expression { $$ = new AssignmentNode($1, $3); free($1); }
+    | postfix_expression ASSIGN expression { 
+        if (auto memberAccess = dynamic_cast<MemberAccessNode*>($1)) {
+            $$ = new MemberAssignmentNode(memberAccess->object, memberAccess->memberName, $3);
+            delete memberAccess;
+        } else if (auto selfMemberAccess = dynamic_cast<SelfMemberAccessNode*>($1)) {
+            $$ = new SelfMemberAssignmentNode(selfMemberAccess->attributeName, $3);
+            delete selfMemberAccess;
+        } else {
+            $$ = new AssignmentNode("", $3);
+        }
+    }
     | IF expression ast_construct ELSE ast_construct {
             ConditionalNode* condNode = new ConditionalNode();
             condNode->addBranch($2, $3);

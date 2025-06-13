@@ -13,6 +13,8 @@
 #include "Context/IContext.hpp"
 #include "Expressions/AdditionNode.hpp"
 #include "Expressions/AssignmentNode.hpp"
+#include "Expressions/MemberAssignmentNode.hpp"
+#include "Expressions/SelfMemberAssignmentNode.hpp"
 #include "Expressions/DivisionNode.hpp"
 #include "Expressions/MultiplicationNode.hpp"
 #include "Expressions/SubtractionNode.hpp"

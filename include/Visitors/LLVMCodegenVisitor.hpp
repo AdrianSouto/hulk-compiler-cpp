@@ -39,6 +39,8 @@ class LessNode;
 class LessEqNode;
 class ModuloNode;
 class AssignmentNode;
+class MemberAssignmentNode;
+class SelfMemberAssignmentNode;
 class ExpressionStatementNode;
 class WhileNode;
 class BlockExprNode;
@@ -107,6 +109,8 @@ public:
     void visit(LessEqNode& node);
     void visit(ModuloNode& node);
     void visit(AssignmentNode& node);
+    void visit(MemberAssignmentNode& node);
+    void visit(SelfMemberAssignmentNode& node);
     void visit(ExpressionStatementNode& node);
     void visit(WhileNode& node);
     void visit(BlockExprNode& node);

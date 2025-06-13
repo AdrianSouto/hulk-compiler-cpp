@@ -1,6 +1,8 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Expressions/LetExprNode.hpp"
 #include "Expressions/AssignmentNode.hpp"
+#include "Expressions/MemberAssignmentNode.hpp"
+#include "Expressions/SelfMemberAssignmentNode.hpp"
 #include "Expressions/BlockExprNode.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
 
@@ -69,6 +71,28 @@ void LLVMCodegenVisitor::visit(AssignmentNode& node) {
         
         lastValue = nullptr;
     }
+}
+
+void LLVMCodegenVisitor::visit(MemberAssignmentNode& node) {
+
+
+    node.value->accept(*this);
+    llvm::Value* val = lastValue;
+    
+
+
+    lastValue = val;
+}
+
+void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
+
+
+    node.value->accept(*this);
+    llvm::Value* val = lastValue;
+    
+
+
+    lastValue = val;
 }
 
 void LLVMCodegenVisitor::visit(BlockExprNode& node) {
