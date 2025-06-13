@@ -12,11 +12,11 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
     node.right->accept(*this);
     llvm::Value* rightValue = lastValue;
     
-    
+
     bool leftIsString = leftValue->getType()->isPointerTy();
     bool rightIsString = rightValue->getType()->isPointerTy();
     
-    
+
     llvm::Function* mallocFunc = module.getFunction("malloc");
     if (!mallocFunc) {
         llvm::FunctionType* mallocType = llvm::FunctionType::get(
@@ -42,7 +42,7 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
     );
     llvm::FunctionCallee sprintfFunc = module.getOrInsertFunction("sprintf", sprintfType);
     
-    
+
     llvm::FunctionType* strcpyType = llvm::FunctionType::get(
         llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
         {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
@@ -57,31 +57,53 @@ void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
     );
     llvm::FunctionCallee strcatFunc = module.getOrInsertFunction("strcat", strcatType);
     
-    
+
     if (leftIsString) {
-        
+
         builder.CreateCall(strcpyFunc, {bufPtr, leftValue});
+    } else if (leftValue->getType()->isIntegerTy(1)) {
+
+        llvm::Value* trueStr = builder.CreateGlobalStringPtr("true");
+        llvm::Value* falseStr = builder.CreateGlobalStringPtr("false");
+        llvm::Value* selectedStr = builder.CreateSelect(leftValue, trueStr, falseStr, "bool_str");
+        builder.CreateCall(strcpyFunc, {bufPtr, selectedStr});
     } else {
-        
-        llvm::Value* formatStr = builder.CreateGlobalStringPtr("%d");
+
+        llvm::Value* formatStr;
+        if (leftValue->getType()->isDoubleTy() || leftValue->getType()->isFloatTy()) {
+            formatStr = builder.CreateGlobalStringPtr("%g");
+        } else {
+            formatStr = builder.CreateGlobalStringPtr("%d");
+        }
         builder.CreateCall(sprintfFunc, {bufPtr, formatStr, leftValue});
     }
     
-    
+
     if (rightIsString) {
-        
+
         builder.CreateCall(strcatFunc, {bufPtr, rightValue});
+    } else if (rightValue->getType()->isIntegerTy(1)) {
+
+        llvm::Value* trueStr = builder.CreateGlobalStringPtr("true");
+        llvm::Value* falseStr = builder.CreateGlobalStringPtr("false");
+        llvm::Value* selectedStr = builder.CreateSelect(rightValue, trueStr, falseStr, "bool_str");
+        builder.CreateCall(strcatFunc, {bufPtr, selectedStr});
     } else {
-        
+
         
         llvm::Value* tempBufSize = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), 32);
         llvm::Value* tempBufPtr = builder.CreateCall(mallocFunc, {tempBufSize}, "temp_heap_buf");
         
-        llvm::Value* formatStr = builder.CreateGlobalStringPtr("%d");
+        llvm::Value* formatStr;
+        if (rightValue->getType()->isDoubleTy() || rightValue->getType()->isFloatTy()) {
+            formatStr = builder.CreateGlobalStringPtr("%g");
+        } else {
+            formatStr = builder.CreateGlobalStringPtr("%d");
+        }
         builder.CreateCall(sprintfFunc, {tempBufPtr, formatStr, rightValue});
         builder.CreateCall(strcatFunc, {bufPtr, tempBufPtr});
         
-        
+
         llvm::Function* freeFunc = module.getFunction("free");
         if (!freeFunc) {
             llvm::FunctionType* freeType = llvm::FunctionType::get(

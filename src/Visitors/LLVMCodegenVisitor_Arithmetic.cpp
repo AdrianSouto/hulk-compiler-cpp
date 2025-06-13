@@ -15,7 +15,25 @@ void LLVMCodegenVisitor::visit(AdditionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    lastValue = builder.CreateAdd(l, r, "addtmp");
+    
+
+    if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
+
+        if (!l->getType()->isDoubleTy()) {
+            if (l->getType()->isIntegerTy()) {
+                l = builder.CreateSIToFP(l, llvm::Type::getDoubleTy(ctx), "ltodbl");
+            }
+        }
+        if (!r->getType()->isDoubleTy()) {
+            if (r->getType()->isIntegerTy()) {
+                r = builder.CreateSIToFP(r, llvm::Type::getDoubleTy(ctx), "rtodbl");
+            }
+        }
+        lastValue = builder.CreateFAdd(l, r, "addtmp");
+    } else {
+
+        lastValue = builder.CreateAdd(l, r, "addtmp");
+    }
 }
 
 void LLVMCodegenVisitor::visit(SubtractionNode& node) {
@@ -23,7 +41,25 @@ void LLVMCodegenVisitor::visit(SubtractionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    lastValue = builder.CreateSub(l, r, "subtmp");
+    
+
+    if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
+
+        if (!l->getType()->isDoubleTy()) {
+            if (l->getType()->isIntegerTy()) {
+                l = builder.CreateSIToFP(l, llvm::Type::getDoubleTy(ctx), "ltodbl");
+            }
+        }
+        if (!r->getType()->isDoubleTy()) {
+            if (r->getType()->isIntegerTy()) {
+                r = builder.CreateSIToFP(r, llvm::Type::getDoubleTy(ctx), "rtodbl");
+            }
+        }
+        lastValue = builder.CreateFSub(l, r, "subtmp");
+    } else {
+
+        lastValue = builder.CreateSub(l, r, "subtmp");
+    }
 }
 
 void LLVMCodegenVisitor::visit(MultiplicationNode& node) {
@@ -31,7 +67,25 @@ void LLVMCodegenVisitor::visit(MultiplicationNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    lastValue = builder.CreateMul(l, r, "multmp");
+    
+
+    if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
+
+        if (!l->getType()->isDoubleTy()) {
+            if (l->getType()->isIntegerTy()) {
+                l = builder.CreateSIToFP(l, llvm::Type::getDoubleTy(ctx), "ltodbl");
+            }
+        }
+        if (!r->getType()->isDoubleTy()) {
+            if (r->getType()->isIntegerTy()) {
+                r = builder.CreateSIToFP(r, llvm::Type::getDoubleTy(ctx), "rtodbl");
+            }
+        }
+        lastValue = builder.CreateFMul(l, r, "multmp");
+    } else {
+
+        lastValue = builder.CreateMul(l, r, "multmp");
+    }
 }
 
 void LLVMCodegenVisitor::visit(DivisionNode& node) {
@@ -39,7 +93,25 @@ void LLVMCodegenVisitor::visit(DivisionNode& node) {
     llvm::Value* l = lastValue;
     node.right->accept(*this);
     llvm::Value* r = lastValue;
-    lastValue = builder.CreateSDiv(l, r, "divtmp");
+    
+
+    if (l->getType()->isDoubleTy() || r->getType()->isDoubleTy()) {
+
+        if (!l->getType()->isDoubleTy()) {
+            if (l->getType()->isIntegerTy()) {
+                l = builder.CreateSIToFP(l, llvm::Type::getDoubleTy(ctx), "ltodbl");
+            }
+        }
+        if (!r->getType()->isDoubleTy()) {
+            if (r->getType()->isIntegerTy()) {
+                r = builder.CreateSIToFP(r, llvm::Type::getDoubleTy(ctx), "rtodbl");
+            }
+        }
+        lastValue = builder.CreateFDiv(l, r, "divtmp");
+    } else {
+
+        lastValue = builder.CreateSDiv(l, r, "divtmp");
+    }
 }
 
 void LLVMCodegenVisitor::visit(PowerNode& node) {

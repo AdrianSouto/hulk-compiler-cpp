@@ -762,6 +762,20 @@ type_member:
         $$ = new DefFuncNode($1, params, $5, nullptr);
         free($1);
     }
+    | IDENTIFIER LPAREN parameter_list RPAREN COLON type ARROW expression SEMICOLON {
+        std::vector<Parameter> params;
+        for (const auto& pair : *$3) {
+            params.emplace_back(pair.id, pair.type);
+        }
+        $$ = new DefFuncNode($1, params, $8, $6);
+        delete $3;
+        free($1);
+    }
+    | IDENTIFIER LPAREN RPAREN COLON type ARROW expression SEMICOLON {
+        std::vector<Parameter> params;
+        $$ = new DefFuncNode($1, params, $7, $5);
+        free($1);
+    }
     ;
 
 %%

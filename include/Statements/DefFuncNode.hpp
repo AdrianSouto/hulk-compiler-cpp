@@ -15,11 +15,11 @@ public:
     Type* returnType;                   
     ExpressionNode* expr;
 
-    
+
     DefFuncNode(const std::string& id, const std::vector<Parameter>& params, 
                 ExpressionNode* expr, Type* retType = nullptr);
     
-    
+
     DefFuncNode(const std::string& id, const std::vector<std::string>& args, ExpressionNode* expr);
 
     void execute() const override;
@@ -27,13 +27,11 @@ public:
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     
-    
+
     bool validateParameterTypes(IContext* context);
     bool validateReturnType(IContext* context);
-    Type* inferReturnType(IContext* context);
     
     ~DefFuncNode();
 };
 
-#endif 
-
+#endif

@@ -24,7 +24,7 @@ static std::map<std::string, llvm::StructType*> structTypes;
 
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
-        return llvm::Type::getDoubleTy(ctx);
+        return llvm::Type::getInt32Ty(ctx);
     } else if (typeName == "String") {
         return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Boolean") {
@@ -54,7 +54,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             TypeDefNode* parentTypeDef = parentTypeIt->second;
 
             for (const auto& attr : parentTypeDef->attributes) {
-                std::string typeName = "Object";
+                std::string typeName = "Number";
                 if (attr.type) {
                     typeName = attr.type->toString();
                 }
@@ -67,7 +67,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     
 
     for (const auto& attr : node.attributes) {
-        std::string typeName = "Object";
+        std::string typeName = "Number";
         if (attr.type) {
             typeName = attr.type->toString();
         }
@@ -138,7 +138,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             TypeDefNode* parentTypeDef = parentTypeIt->second;
 
             for (const auto& param : parentTypeDef->typeArguments) {
-                std::string typeName = "Object";
+                std::string typeName = "Number";
                 if (param.type) {
                     typeName = param.type->toString();
                 }
@@ -150,7 +150,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     
 
     for (const auto& param : node.typeArguments) {
-        std::string typeName = "Object";
+        std::string typeName = "Number";
         if (param.type) {
             typeName = param.type->toString();
         }
@@ -210,13 +210,13 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     ++argIt;
                 } else {
 
-                    std::string attrTypeName = "Object";
+                    std::string attrTypeName = "Number";
                     if (parentTypeDef->attributes[i].type) {
                         attrTypeName = parentTypeDef->attributes[i].type->toString();
                     }
                     
                     if (attrTypeName == "Number") {
-                        initValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
+                        initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
                     } else if (attrTypeName == "Boolean") {
                         initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
                     } else if (attrTypeName == "String") {
@@ -244,13 +244,13 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             ++argIt;
         } else {
 
-            std::string attrTypeName = "Object";
+            std::string attrTypeName = "Number";
             if (node.attributes[i].type) {
                 attrTypeName = node.attributes[i].type->toString();
             }
             
             if (attrTypeName == "Number") {
-                initValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
+                initValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
             } else if (attrTypeName == "Boolean") {
                 initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
             } else if (attrTypeName == "String") {
@@ -290,9 +290,28 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
     
 
     std::vector<llvm::Value*> args;
+    auto paramIt = constructorFunc->arg_begin();
     for (auto arg : node.arguments) {
         arg->accept(*this);
-        if (lastValue) {
+        if (lastValue && paramIt != constructorFunc->arg_end()) {
+            llvm::Value* argVal = lastValue;
+            llvm::Type* expectedType = paramIt->getType();
+            
+
+            if (argVal->getType() != expectedType) {
+                if (argVal->getType()->isIntegerTy() && expectedType->isIntegerTy()) {
+
+                    if (argVal->getType()->getIntegerBitWidth() < expectedType->getIntegerBitWidth()) {
+                        argVal = builder.CreateZExt(argVal, expectedType, "arg_int_extend");
+                    } else if (argVal->getType()->getIntegerBitWidth() > expectedType->getIntegerBitWidth()) {
+                        argVal = builder.CreateTrunc(argVal, expectedType, "arg_int_trunc");
+                    }
+                }
+            }
+            
+            args.push_back(argVal);
+            ++paramIt;
+        } else if (lastValue) {
             args.push_back(lastValue);
         }
     }
@@ -305,7 +324,6 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
-
 
     
 
@@ -544,8 +562,7 @@ void LLVMCodegenVisitor::visit(IsNode& node) {
     
 
     if (node.typeName == "Number") {
-        isMatch = exprType->isDoubleTy() || exprType->isFloatTy() || 
-                 (exprType->isIntegerTy() && !exprType->isIntegerTy(1));
+        isMatch = exprType->isIntegerTy() && !exprType->isIntegerTy(1);
     } else if (node.typeName == "String") {
 
         isMatch = exprType->isPointerTy();
@@ -554,7 +571,6 @@ void LLVMCodegenVisitor::visit(IsNode& node) {
     } else if (node.typeName == "Object") {
         isMatch = exprType->isPointerTy();
     } else {
-
 
         isMatch = exprType->isPointerTy();
     }
@@ -580,23 +596,14 @@ void LLVMCodegenVisitor::visit(AsNode& node) {
     if (exprType == targetType) {
 
         lastValue = exprValue;
-    } else if (exprType->isIntegerTy() && targetType->isDoubleTy()) {
+    } else if (exprType->isIntegerTy() && targetType->isIntegerTy()) {
 
-        if (exprType->isIntegerTy(1)) {
-
-            llvm::Value* intVal = builder.CreateZExt(exprValue, llvm::Type::getInt32Ty(ctx));
-            lastValue = builder.CreateSIToFP(intVal, targetType, "bool_to_double");
+        if (exprType->getIntegerBitWidth() < targetType->getIntegerBitWidth()) {
+            lastValue = builder.CreateZExt(exprValue, targetType, "int_extend");
+        } else if (exprType->getIntegerBitWidth() > targetType->getIntegerBitWidth()) {
+            lastValue = builder.CreateTrunc(exprValue, targetType, "int_trunc");
         } else {
-            lastValue = builder.CreateSIToFP(exprValue, targetType, "int_to_double");
-        }
-    } else if (exprType->isDoubleTy() && targetType->isIntegerTy()) {
-
-        if (targetType->isIntegerTy(1)) {
-
-            llvm::Value* zero = llvm::ConstantFP::get(exprType, 0.0);
-            lastValue = builder.CreateFCmpONE(exprValue, zero, "double_to_bool");
-        } else {
-            lastValue = builder.CreateFPToSI(exprValue, targetType, "double_to_int");
+            lastValue = exprValue;
         }
     } else if (exprType->isIntegerTy(1) && targetType->isIntegerTy()) {
 

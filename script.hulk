@@ -1,14 +1,6 @@
-type PersonType(firstname_func, lastname_func , uno) {
-    firstname_func = firstname_func;
-    lastname_func = lastname_func;
-    uno = uno;
-
-    name_func() => uno @@ "self.lastname_func";
-}
-
-type KnightType inherits PersonType {
-    name_func() => "Siir" @@ base();
-}
-
-let p = new KnightType("Philo", "Collinse" , "awa") in
-    print(p.name_func()); // prints 'Sir Phil Collins'
+let a = 42, mod = a % 3 in
+    print(
+        if (mod == 0) "Magic"
+        elif (mod % 3 == 1) "Woke"
+        else "Dumb"
+    );

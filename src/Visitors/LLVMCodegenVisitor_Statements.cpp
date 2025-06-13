@@ -52,6 +52,9 @@ void LLVMCodegenVisitor::visit(PrintStatementNode& node) {
     } else if (val->getType()->isIntegerTy()) {
 
         formatStr = builder.CreateGlobalStringPtr("%d\n");
+    } else if (val->getType()->isDoubleTy()) {
+
+        formatStr = builder.CreateGlobalStringPtr("%.6g\n");
     } else {
 
         formatStr = builder.CreateGlobalStringPtr("Unsupported type\n");
