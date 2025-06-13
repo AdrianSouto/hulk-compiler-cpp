@@ -2,6 +2,10 @@
 #include "Context/IContext.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
+#include "Expressions/NumberNode.hpp"
+#include "Expressions/StringLiteralNode.hpp"
+#include "Expressions/BooleanNode.hpp"
+#include "Expressions/ConcatenationNode.hpp"
 #include <iostream>
 #include <unordered_set>
 
@@ -102,34 +106,88 @@ bool DefFuncNode::validate(IContext* context) {
 
 bool DefFuncNode::validateParameterTypes(IContext* context) {
 
+
+    bool isMethodInType = false;
+    
+
     for (const auto& param : parameters) {
-        if (!param.hasType()) {
-            errorMessage = "Error in function '" + identifier + "': Parameter '" + param.name + "' must have an explicit type";
-            return false;
-        }
-        
-        if (param.type->getKind() == TypeKind::UNKNOWN) {
-            errorMessage = "Error in function '" + identifier + "': Invalid type for parameter '" + param.name + "'";
-            return false;
+        if (param.name == "self") {
+            isMethodInType = true;
+            break;
         }
     }
+    
+
+    if (isMethodInType) {
+        for (const auto& param : parameters) {
+            if (!param.hasType() && param.name != "self") {
+                errorMessage = "Error in method '" + identifier + "': Parameter '" + param.name + "' must have an explicit type";
+                return false;
+            }
+            
+            if (param.hasType() && param.type->getKind() == TypeKind::UNKNOWN) {
+                errorMessage = "Error in method '" + identifier + "': Invalid type for parameter '" + param.name + "'";
+                return false;
+            }
+        }
+    }
+
+    
     return true;
 }
 
 bool DefFuncNode::validateReturnType(IContext* context) {
 
-    if (!returnType) {
-        errorMessage = "Error in function '" + identifier + "': Return type must be explicitly declared";
-        return false;
+    bool isMethodInType = false;
+    for (const auto& param : parameters) {
+        if (param.name == "self") {
+            isMethodInType = true;
+            break;
+        }
     }
     
 
-    if (returnType->getKind() == TypeKind::UNKNOWN) {
-        errorMessage = "Error in function '" + identifier + "': Invalid return type";
-        return false;
+    if (isMethodInType) {
+        if (!returnType) {
+            errorMessage = "Error in method '" + identifier + "': Return type must be explicitly declared";
+            return false;
+        }
+        
+        if (returnType->getKind() == TypeKind::UNKNOWN) {
+            errorMessage = "Error in method '" + identifier + "': Invalid return type";
+            return false;
+        }
     }
+
     
     return true;
+}
+
+Type* DefFuncNode::inferReturnType(IContext* context) {
+
+    
+
+    if (dynamic_cast<NumberNode*>(expr)) {
+        return Type::getNumberType();
+    }
+    
+
+    if (dynamic_cast<StringLiteralNode*>(expr)) {
+        return Type::getStringType();
+    }
+    
+
+    if (dynamic_cast<BooleanNode*>(expr)) {
+        return Type::getBooleanType();
+    }
+    
+
+    if (dynamic_cast<ConcatenationNode*>(expr)) {
+        return Type::getStringType();
+    }
+    
+
+    return Type::getNumberType();
 }
 
 void DefFuncNode::accept(LLVMCodegenVisitor& visitor) {

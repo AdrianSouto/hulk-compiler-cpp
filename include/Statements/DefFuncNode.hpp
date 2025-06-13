@@ -30,6 +30,7 @@ public:
 
     bool validateParameterTypes(IContext* context);
     bool validateReturnType(IContext* context);
+    Type* inferReturnType(IContext* context);
     
     ~DefFuncNode();
 };
