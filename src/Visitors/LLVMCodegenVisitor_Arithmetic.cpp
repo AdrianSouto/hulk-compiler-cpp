@@ -153,12 +153,12 @@ void LLVMCodegenVisitor::visit(ModuloNode& node) {
     llvm::Value* cond = builder.CreateICmpNE(r, zero, "isNotZero");
     builder.CreateCondBr(cond, thenBlock, elseBlock);
 
-    builder.SetInsertPoint(thenBlock);
+    builder.SetInsert(thenBlock);
     llvm::Value* resultNonZero = builder.CreateSRem(l, r, "modtmp");
     builder.CreateBr(mergeBlock);
     thenBlock = builder.GetInsertBlock(); 
 
-    builder.SetInsertPoint(elseBlock);
+    builder.SetInsert(elseBlock);
     
     
     llvm::Value* resultZero = llvm::ConstantInt::get(l->getType(), 0, true); 
@@ -167,7 +167,7 @@ void LLVMCodegenVisitor::visit(ModuloNode& node) {
     builder.CreateBr(mergeBlock);
     elseBlock = builder.GetInsertBlock(); 
 
-    builder.SetInsertPoint(mergeBlock);
+    builder.SetInsert(mergeBlock);
     llvm::PHINode* phi = builder.CreatePHI(l->getType(), 2, "modresult");
     phi->addIncoming(resultNonZero, thenBlock);
     phi->addIncoming(resultZero, elseBlock);

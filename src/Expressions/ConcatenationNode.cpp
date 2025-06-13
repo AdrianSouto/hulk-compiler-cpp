@@ -40,20 +40,20 @@ llvm::Value* ConcatenationNode::CodeGen(LLVMCodegenVisitor& visitor) {
     llvm::Value* rightValue = visitor.lastValue;
 
     
-    bool isLeftString = leftValue->getType()->isPointerTy();
-    bool isRightString = rightValue->getType()->isPointerTy();
+    bool isLeftString = leftValue->getType()->iserTy();
+    bool isRightString = rightValue->getType()->iserTy();
     
     
     
     llvm::Constant* emptyStr = builder.CreateGlobalString("", "concatbuf");
-    llvm::Value* resultBuf = builder.CreatePointerCast(
-        emptyStr, llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0));
+    llvm::Value* resultBuf = builder.CreateerCast(
+        emptyStr, llvm::erType::get(llvm::Type::getInt8Ty(context), 0));
     
     
     llvm::FunctionType* strcpyType = llvm::FunctionType::get(
-        llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0),
-        {llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0), 
-         llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0)},
+        llvm::erType::get(llvm::Type::getInt8Ty(context), 0),
+        {llvm::erType::get(llvm::Type::getInt8Ty(context), 0),
+         llvm::erType::get(llvm::Type::getInt8Ty(context), 0)},
         false
     );
     llvm::Function* strcpyFunc = llvm::cast<llvm::Function>(
@@ -61,9 +61,9 @@ llvm::Value* ConcatenationNode::CodeGen(LLVMCodegenVisitor& visitor) {
     );
     
     llvm::FunctionType* strcatType = llvm::FunctionType::get(
-        llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0),
-        {llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0), 
-         llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0)},
+        llvm::erType::get(llvm::Type::getInt8Ty(context), 0),
+        {llvm::erType::get(llvm::Type::getInt8Ty(context), 0),
+         llvm::erType::get(llvm::Type::getInt8Ty(context), 0)},
         false
     );
     llvm::Function* strcatFunc = llvm::cast<llvm::Function>(
@@ -82,8 +82,8 @@ llvm::Value* ConcatenationNode::CodeGen(LLVMCodegenVisitor& visitor) {
         );
         
         llvm::Constant* numStrConst = builder.CreateGlobalString(numStr, "num_str");
-        llvm::Value* numStrVal = builder.CreatePointerCast(
-            numStrConst, llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0));
+        llvm::Value* numStrVal = builder.CreateerCast(
+            numStrConst, llvm::erType::get(llvm::Type::getInt8Ty(context), 0));
         builder.CreateCall(strcpyFunc, {resultBuf, numStrVal});
     }
     
@@ -98,8 +98,8 @@ llvm::Value* ConcatenationNode::CodeGen(LLVMCodegenVisitor& visitor) {
         );
         
         llvm::Constant* numStrConst = builder.CreateGlobalString(numStr, "num_str2");
-        llvm::Value* numStrVal = builder.CreatePointerCast(
-            numStrConst, llvm::PointerType::get(llvm::Type::getInt8Ty(context), 0));
+        llvm::Value* numStrVal = builder.CreateerCast(
+            numStrConst, llvm::erType::get(llvm::Type::getInt8Ty(context), 0));
         builder.CreateCall(strcatFunc, {resultBuf, numStrVal});
     }
     

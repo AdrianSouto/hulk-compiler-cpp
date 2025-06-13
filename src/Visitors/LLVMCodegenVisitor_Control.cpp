@@ -48,7 +48,7 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
     std::vector<std::pair<llvm::BasicBlock*, llvm::Value*>> valueProducingBlocks;
 
     for (size_t i = 0; i < node.branches.size(); ++i) {
-        builder.SetInsertPoint(branchCondBlocks[i]);
+        builder.SetInsert(branchCondBlocks[i]);
         node.branches[i].condition->accept(*this);
         llvm::Value* condValue = lastValue;
         
@@ -57,7 +57,7 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
         llvm::BasicBlock* nextCondBlockOrElse = (i + 1 < node.branches.size()) ? branchCondBlocks[i+1] : elseEntryBlock;
         builder.CreateCondBr(condValue, branchBodyBlocks[i], nextCondBlockOrElse);
 
-        builder.SetInsertPoint(branchBodyBlocks[i]);
+        builder.SetInsert(branchBodyBlocks[i]);
         node.branches[i].body->accept(*this); 
         
         if (lastValue) { 
@@ -80,7 +80,7 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
             
             
         }
-        builder.SetInsertPoint(actualElseBodyBlock);
+        builder.SetInsert(actualElseBodyBlock);
         node.elseBody->accept(*this); 
         if (lastValue) {
             valueProducingBlocks.push_back({builder.GetInsertBlock(), lastValue});
@@ -96,7 +96,7 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
         
     }
 
-    builder.SetInsertPoint(afterBlock);
+    builder.SetInsert(afterBlock);
 
     if (!valueProducingBlocks.empty()) {
         
@@ -160,7 +160,7 @@ void LLVMCodegenVisitor::visit(WhileNode& node) {
     builder.CreateBr(condBlock);
     
     
-    builder.SetInsertPoint(condBlock);
+    builder.SetInsert(condBlock);
     
     
     node.condition->accept(*this);
@@ -173,7 +173,7 @@ void LLVMCodegenVisitor::visit(WhileNode& node) {
     builder.CreateCondBr(condBool, bodyBlock, afterBlock);
     
     
-    builder.SetInsertPoint(bodyBlock);
+    builder.SetInsert(bodyBlock);
     
     
     node.body->accept(*this);
@@ -187,7 +187,7 @@ void LLVMCodegenVisitor::visit(WhileNode& node) {
     builder.CreateBr(condBlock);
     
     
-    builder.SetInsertPoint(afterBlock);
+    builder.SetInsert(afterBlock);
     
     
     lastValue = builder.CreateLoad(resultAlloca->getAllocatedType(), resultAlloca, "whilefinalvalue");
@@ -222,13 +222,13 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     builder.CreateBr(condBB);
 
     
-    builder.SetInsertPoint(condBB);
+    builder.SetInsert(condBB);
     llvm::Value* currentVar = builder.CreateLoad(intType, loopVar, "loop.var");
     llvm::Value* cond = builder.CreateICmpSLT(currentVar, endValue, "for.cond");
     builder.CreateCondBr(cond, bodyBB, afterBB);
 
     
-    builder.SetInsertPoint(bodyBB);
+    builder.SetInsert(bodyBB);
 
     
     localVarsStack.push_back(localVarsStack.back());
@@ -246,7 +246,7 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     builder.CreateBr(incBB);
 
     
-    builder.SetInsertPoint(incBB);
+    builder.SetInsert(incBB);
     llvm::Value* nextVar = builder.CreateAdd(
         builder.CreateLoad(intType, loopVar, "loop.var"),
         llvm::ConstantInt::get(intType, 1),
@@ -256,7 +256,7 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     builder.CreateBr(condBB);
 
     
-    builder.SetInsertPoint(afterBB);
+    builder.SetInsert(afterBB);
 
     
     lastValue = nullptr;

@@ -19,21 +19,21 @@
 #include <iostream>
 
 
-static std::map<std::string, llvm::StructType*> structTypes;
+std::map<std::string, llvm::StructType*> structTypes;
 
 
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
         return llvm::Type::getInt32Ty(ctx);
     } else if (typeName == "String") {
-        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+        return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Boolean") {
         return llvm::Type::getInt1Ty(ctx);
     } else if (typeName == "Object") {
-        return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+        return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
     }
 
-    return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+    return llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0);
 }
 
 
@@ -159,7 +159,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     }
     
     llvm::FunctionType* constructorType = llvm::FunctionType::get(
-        llvm::PointerType::get(structType, 0), 
+        llvm::erType::get(structType, 0),
         constructorParamTypes,
         false
     );
@@ -180,7 +180,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     llvm::Function* mallocFunc = module.getFunction("malloc");
     if (!mallocFunc) {
         llvm::FunctionType* mallocType = llvm::FunctionType::get(
-            llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+            llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0),
             {llvm::Type::getInt64Ty(ctx)},
             false
         );
@@ -188,7 +188,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     }
     
     llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, {structSize});
-    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));
+    llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::erType::get(structType, 0));
     
 
     auto argIt = constructorFunc->arg_begin();
@@ -226,9 +226,9 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                         } else if (attrTypeName == "Boolean") {
                             initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
                         } else if (attrTypeName == "String") {
-                            initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                            initValue = llvm::ConstanterNull::get(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
                         } else {
-                            initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                            initValue = llvm::ConstanterNull::get(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
                         }
                     }
                 }
@@ -267,9 +267,9 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                 } else if (attrTypeName == "Boolean") {
                     initValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 0);
                 } else if (attrTypeName == "String") {
-                    initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                    initValue = llvm::ConstanterNull::get(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
                 } else {
-                    initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+                    initValue = llvm::ConstanterNull::get(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
                 }
             }
         }
@@ -465,7 +465,7 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
 
 
             std::cerr << "Warning: MemberAccessNode implementation is incomplete" << std::endl;
-            lastValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+            lastValue = llvm::ConstanterNull::get(llvm::erType::get(llvm::Type::getInt8Ty(ctx), 0));
         } else {
             std::cerr << "Error: Member '" << node.memberName << "' not found" << std::endl;
             lastValue = nullptr;
@@ -578,14 +578,14 @@ void LLVMCodegenVisitor::visit(IsNode& node) {
         isMatch = exprType->isIntegerTy() && !exprType->isIntegerTy(1);
     } else if (node.typeName == "String") {
 
-        isMatch = exprType->isPointerTy();
+        isMatch = exprType->iserTy();
     } else if (node.typeName == "Boolean") {
         isMatch = exprType->isIntegerTy(1);
     } else if (node.typeName == "Object") {
-        isMatch = exprType->isPointerTy();
+        isMatch = exprType->iserTy();
     } else {
 
-        isMatch = exprType->isPointerTy();
+        isMatch = exprType->iserTy();
     }
     
     lastValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), isMatch ? 1 : 0);
@@ -625,7 +625,7 @@ void LLVMCodegenVisitor::visit(AsNode& node) {
 
         llvm::Value* zero = llvm::ConstantInt::get(exprType, 0);
         lastValue = builder.CreateICmpNE(exprValue, zero, "int_to_bool");
-    } else if (exprType->isPointerTy() && targetType->isPointerTy()) {
+    } else if (exprType->iserTy() && targetType->iserTy()) {
 
         lastValue = builder.CreateBitCast(exprValue, targetType, "ptr_cast");
     } else {
@@ -634,7 +634,7 @@ void LLVMCodegenVisitor::visit(AsNode& node) {
                   << exprType->getTypeID() << " to " << targetType->getTypeID() << std::endl;
         
 
-        if (exprType->isPointerTy() && targetType->isPointerTy()) {
+        if (exprType->iserTy() && targetType->iserTy()) {
             lastValue = builder.CreateBitCast(exprValue, targetType, "unsafe_cast");
         } else {
             lastValue = exprValue;
