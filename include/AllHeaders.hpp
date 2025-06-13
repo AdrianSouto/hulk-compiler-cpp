@@ -56,4 +56,4 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
 
-#endif 
+#endif // ALL_HEADERS_HPP
