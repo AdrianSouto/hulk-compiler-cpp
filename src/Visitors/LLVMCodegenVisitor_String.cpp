@@ -1,0 +1,103 @@
+#include "Visitors/LLVMCodegenVisitor.hpp"
+#include "Expressions/ConcatenationNode.hpp"
+
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Type.h>
+
+void LLVMCodegenVisitor::visit(ConcatenationNode& node) {
+    node.left->accept(*this);
+    llvm::Value* leftValue = lastValue;
+    
+    node.right->accept(*this);
+    llvm::Value* rightValue = lastValue;
+    
+    
+    bool leftIsString = leftValue->getType()->isPointerTy();
+    bool rightIsString = rightValue->getType()->isPointerTy();
+    
+    
+    llvm::Function* mallocFunc = module.getFunction("malloc");
+    if (!mallocFunc) {
+        llvm::FunctionType* mallocType = llvm::FunctionType::get(
+            llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+            {llvm::Type::getInt64Ty(ctx)},
+            false
+        );
+        mallocFunc = llvm::Function::Create(
+            mallocType,
+            llvm::Function::ExternalLinkage,
+            "malloc",
+            module
+        );
+    }
+    
+    llvm::Value* bufSize = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), 256);
+    llvm::Value* bufPtr = builder.CreateCall(mallocFunc, {bufSize}, "concat_heap_buf");
+    
+    llvm::FunctionType* sprintfType = llvm::FunctionType::get(
+        llvm::Type::getInt32Ty(ctx),
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        true
+    );
+    llvm::FunctionCallee sprintfFunc = module.getOrInsertFunction("sprintf", sprintfType);
+    
+    
+    llvm::FunctionType* strcpyType = llvm::FunctionType::get(
+        llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        false
+    );
+    llvm::FunctionCallee strcpyFunc = module.getOrInsertFunction("strcpy", strcpyType);
+    
+    llvm::FunctionType* strcatType = llvm::FunctionType::get(
+        llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
+        false
+    );
+    llvm::FunctionCallee strcatFunc = module.getOrInsertFunction("strcat", strcatType);
+    
+    
+    if (leftIsString) {
+        
+        builder.CreateCall(strcpyFunc, {bufPtr, leftValue});
+    } else {
+        
+        llvm::Value* formatStr = builder.CreateGlobalStringPtr("%d");
+        builder.CreateCall(sprintfFunc, {bufPtr, formatStr, leftValue});
+    }
+    
+    
+    if (rightIsString) {
+        
+        builder.CreateCall(strcatFunc, {bufPtr, rightValue});
+    } else {
+        
+        
+        llvm::Value* tempBufSize = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), 32);
+        llvm::Value* tempBufPtr = builder.CreateCall(mallocFunc, {tempBufSize}, "temp_heap_buf");
+        
+        llvm::Value* formatStr = builder.CreateGlobalStringPtr("%d");
+        builder.CreateCall(sprintfFunc, {tempBufPtr, formatStr, rightValue});
+        builder.CreateCall(strcatFunc, {bufPtr, tempBufPtr});
+        
+        
+        llvm::Function* freeFunc = module.getFunction("free");
+        if (!freeFunc) {
+            llvm::FunctionType* freeType = llvm::FunctionType::get(
+                llvm::Type::getVoidTy(ctx),
+                {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
+                false
+            );
+            freeFunc = llvm::Function::Create(
+                freeType,
+                llvm::Function::ExternalLinkage,
+                "free",
+                module
+            );
+        }
+        builder.CreateCall(freeFunc, {tempBufPtr});
+    }
+    
+    lastValue = bufPtr;
+}
