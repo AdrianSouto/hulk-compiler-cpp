@@ -4,6 +4,7 @@
 #include "Expressions/ConcatenationNode.hpp"
 #include "Statements/DefFuncNode.hpp"
 #include "Statements/TypeDefNode.hpp"
+#include "Statements/PrintStatementNode.hpp"
 #include "Globals.hpp"
 
 #include <llvm/IR/Constants.h>
@@ -66,9 +67,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
     if (node.returnType) {
         returnType = getLLVMTypeFromName(node.returnType->toString(), ctx);
     } else {
-
-        if (node.expr) {
-
+        if (!node.isBlockBody && node.expr) {
             if (dynamic_cast<ConcatenationNode*>(node.expr)) {
                 returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
                 std::cerr << "DEBUG: Inferred return type as String for function '" << node.identifier << "'" << std::endl;
@@ -123,10 +122,26 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
         localVarsStack.back()[node.parameters[i].name] = alloca;
     }
     
+    llvm::Value* returnValue = nullptr;
 
-    node.expr->accept(*this);
-    llvm::Value* returnValue = lastValue;
-    
+    if (node.isBlockBody) {
+
+        for (auto statement : node.statements) {
+            statement->accept(*this);
+
+
+            if (dynamic_cast<PrintStatementNode*>(statement) == nullptr) {
+                returnValue = lastValue;
+            }
+        }
+
+
+    } else {
+
+        node.expr->accept(*this);
+        returnValue = lastValue;
+    }
+
 
     if (returnValue) {
         if (returnType->isVoidTy()) {

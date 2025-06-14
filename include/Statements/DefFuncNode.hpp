@@ -11,14 +11,20 @@
 class DefFuncNode : public StatementNode {
 public:
     std::string identifier;
-    std::vector<Parameter> parameters;  
-    Type* returnType;                   
+    std::vector<Parameter> parameters;
+    Type* returnType;
     ExpressionNode* expr;
+    std::vector<StatementNode*> statements;
+    bool isBlockBody;
 
 
-    DefFuncNode(const std::string& id, const std::vector<Parameter>& params, 
+    DefFuncNode(const std::string& id, const std::vector<Parameter>& params,
                 ExpressionNode* expr, Type* retType = nullptr);
-    
+
+
+    DefFuncNode(const std::string& id, const std::vector<Parameter>& params,
+                const std::vector<StatementNode*>& stmts, Type* retType = nullptr);
+
 
     DefFuncNode(const std::string& id, const std::vector<std::string>& args, ExpressionNode* expr);
 
@@ -26,12 +32,11 @@ public:
     void print(int indent = 0) const override;
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
-    
 
     bool validateParameterTypes(IContext* context);
     bool validateReturnType(IContext* context);
     Type* inferReturnType(IContext* context);
-    
+
     ~DefFuncNode();
 };
 

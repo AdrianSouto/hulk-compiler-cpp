@@ -85,6 +85,7 @@ program:
         program.Statements.push_back(new ExpressionStatementNode($1));
     }
     | { }
+
     ;
 
 statement_list:
@@ -192,6 +193,36 @@ statement:
         }
         $$ = new DefFuncNode($2, params, $7, nullptr);
         delete $4;
+        free($2);
+    }
+    | FUNCTION IDENTIFIER LPAREN identifier_list RPAREN LBRACE statement_list_block RBRACE {
+        std::vector<Parameter> params;
+        for (const auto& id : *$4) {
+            params.emplace_back(id, nullptr);
+        }
+        $$ = new DefFuncNode($2, params, *$7, nullptr);
+        delete $4;
+        delete $7;
+        free($2);
+    }
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN LBRACE statement_list_block RBRACE {
+        std::vector<Parameter> params;
+        for (const auto& pair : *$4) {
+            params.emplace_back(pair.id, pair.type);
+        }
+        $$ = new DefFuncNode($2, params, *$7, nullptr);
+        delete $4;
+        delete $7;
+        free($2);
+    }
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type LBRACE statement_list_block RBRACE {
+        std::vector<Parameter> params;
+        for (const auto& pair : *$4) {
+            params.emplace_back(pair.id, pair.type);
+        }
+        $$ = new DefFuncNode($2, params, *$9, $7);
+        delete $4;
+        delete $9;
         free($2);
     }
     | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct SEMICOLON {

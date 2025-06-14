@@ -12,11 +12,16 @@
 
 DefFuncNode::DefFuncNode(const std::string& id, const std::vector<Parameter>& params, 
                          ExpressionNode* e, Type* retType)
-    : identifier(id), parameters(params), returnType(retType), expr(e) {}
+    : identifier(id), parameters(params), returnType(retType), expr(e), isBlockBody(false) {}
+
+
+DefFuncNode::DefFuncNode(const std::string& id, const std::vector<Parameter>& params,
+                        const std::vector<StatementNode*>& stmts, Type* retType)
+    : identifier(id), parameters(params), returnType(retType), expr(nullptr), statements(stmts), isBlockBody(true) {}
 
 
 DefFuncNode::DefFuncNode(const std::string& id, const std::vector<std::string>& args, ExpressionNode* e)
-    : identifier(id), returnType(nullptr), expr(e) {
+    : identifier(id), returnType(nullptr), expr(e), isBlockBody(false) {
 
     for (const auto& arg : args) {
         parameters.emplace_back(arg, nullptr);
@@ -24,12 +29,15 @@ DefFuncNode::DefFuncNode(const std::string& id, const std::vector<std::string>& 
 }
 
 void DefFuncNode::execute() const {
-
-    std::vector<std::string> argNames;
-    for (const auto& param : parameters) {
-        argNames.push_back(param.name);
+    if (!isBlockBody) {
+        std::vector<std::string> argNames;
+        for (const auto& param : parameters) {
+            argNames.push_back(param.name);
+        }
+        functions[identifier] = std::make_pair(argNames, expr);
     }
-    functions[identifier] = std::make_pair(argNames, expr);
+
+
 }
 
 void DefFuncNode::print(int indent) const {
@@ -48,16 +56,25 @@ void DefFuncNode::print(int indent) const {
     }
     std::cout << std::endl;
 
-    for (int i = 0; i < indent + 1; ++i) {
-        std::cout << "  ";
+    if (isBlockBody) {
+        for (int i = 0; i < indent + 1; ++i) {
+            std::cout << "  ";
+        }
+        std::cout << "Body (Block): " << std::endl;
+        for (const auto& stmt : statements) {
+            stmt->print(indent + 2);
+        }
+    } else {
+        for (int i = 0; i < indent + 1; ++i) {
+            std::cout << "  ";
+        }
+        std::cout << "Body: ";
+        expr->print(indent + 2);
     }
-    std::cout << "Body: ";
-    expr->print(indent + 2);
 }
 
 bool DefFuncNode::validate(IContext* context) {
     IContext* innerContext = context->CreateChildContext();
-
 
     std::unordered_set<std::string> paramSet;
     std::vector<std::string> paramNames;
@@ -73,25 +90,33 @@ bool DefFuncNode::validate(IContext* context) {
         innerContext->Define(param.name);
     }
 
-
     if (!validateParameterTypes(innerContext)) {
         delete innerContext;
         return false;
     }
 
+    if (isBlockBody) {
 
-    if (!expr->validate(innerContext)) {
-        errorMessage = "Error in function '" + identifier + "' body: " + expr->getErrorMessage();
-        delete innerContext;
-        return false;
+        for (auto stmt : statements) {
+            if (!stmt->validate(innerContext)) {
+                errorMessage = "Error in function '" + identifier + "' body: " + stmt->getErrorMessage();
+                delete innerContext;
+                return false;
+            }
+        }
+    } else {
+
+        if (!expr->validate(innerContext)) {
+            errorMessage = "Error in function '" + identifier + "' body: " + expr->getErrorMessage();
+            delete innerContext;
+            return false;
+        }
     }
-
 
     if (!validateReturnType(innerContext)) {
         delete innerContext;
         return false;
     }
-
 
     if (!context->Define(identifier, paramNames)) {
         errorMessage = "Error: Function '" + identifier + "' with " +
@@ -105,11 +130,8 @@ bool DefFuncNode::validate(IContext* context) {
 }
 
 bool DefFuncNode::validateParameterTypes(IContext* context) {
-
-
     bool isMethodInType = false;
     
-
     for (const auto& param : parameters) {
         if (param.name == "self") {
             isMethodInType = true;
@@ -117,7 +139,6 @@ bool DefFuncNode::validateParameterTypes(IContext* context) {
         }
     }
     
-
     if (isMethodInType) {
         for (const auto& param : parameters) {
             if (!param.hasType() && param.name != "self") {
@@ -132,12 +153,10 @@ bool DefFuncNode::validateParameterTypes(IContext* context) {
         }
     }
 
-    
     return true;
 }
 
 bool DefFuncNode::validateReturnType(IContext* context) {
-
     bool isMethodInType = false;
     for (const auto& param : parameters) {
         if (param.name == "self") {
@@ -146,7 +165,6 @@ bool DefFuncNode::validateReturnType(IContext* context) {
         }
     }
     
-
     if (isMethodInType) {
         if (!returnType) {
             errorMessage = "Error in method '" + identifier + "': Return type must be explicitly declared";
@@ -159,34 +177,31 @@ bool DefFuncNode::validateReturnType(IContext* context) {
         }
     }
 
-    
     return true;
 }
 
 Type* DefFuncNode::inferReturnType(IContext* context) {
+    if (isBlockBody) {
 
-    
+        return Type::getNumberType();
+    }
 
     if (dynamic_cast<NumberNode*>(expr)) {
         return Type::getNumberType();
     }
     
-
     if (dynamic_cast<StringLiteralNode*>(expr)) {
         return Type::getStringType();
     }
     
-
     if (dynamic_cast<BooleanNode*>(expr)) {
         return Type::getBooleanType();
     }
     
-
     if (dynamic_cast<ConcatenationNode*>(expr)) {
         return Type::getStringType();
     }
     
-
     return Type::getNumberType();
 }
 
@@ -195,5 +210,12 @@ void DefFuncNode::accept(LLVMCodegenVisitor& visitor) {
 }
 
 DefFuncNode::~DefFuncNode() {
-    delete expr;
+    if (!isBlockBody) {
+        delete expr;
+    } else {
+        for (auto stmt : statements) {
+            delete stmt;
+        }
+    }
 }
+
