@@ -102,6 +102,10 @@ statement:
     | PRINT expression { $$ = new PrintStatementNode($2); }
     | IDENTIFIER ASSIGN expression SEMICOLON { $$ = new ExpressionStatementNode(new AssignmentNode($1, $3)); free($1); }
     | IDENTIFIER ASSIGN expression { $$ = new ExpressionStatementNode(new AssignmentNode($1, $3)); free($1); }
+    | IDENTIFIER LPAREN expression_list RPAREN SEMICOLON { $$ = new ExpressionStatementNode(new FuncCallNode($1, *$3)); delete $3; free($1); }
+    | IDENTIFIER LPAREN RPAREN SEMICOLON { $$ = new ExpressionStatementNode(new FuncCallNode($1, {})); free($1); }
+    | IDENTIFIER LPAREN expression_list RPAREN { $$ = new ExpressionStatementNode(new FuncCallNode($1, *$3)); delete $3; free($1); }
+    | IDENTIFIER LPAREN RPAREN { $$ = new ExpressionStatementNode(new FuncCallNode($1, {})); free($1); }
     | LET declaration_list IN statement {
         ASTNode* stmt = $4;
         for (int i = $2->size()-1; i >= 0; i--) {
