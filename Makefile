@@ -1,6 +1,3 @@
-
-
-
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude -fexceptions
 LLVM_CONFIG = llvm-config
@@ -72,6 +69,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Functions.cpp \
               src/Visitors/LLVMCodegenVisitor_Literals.cpp \
               src/Visitors/LLVMCodegenVisitor_Logical.cpp \
+              src/Visitors/LLVMCodegenVisitor_IsNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
@@ -181,3 +179,4 @@ help:
 	@echo "  help     - Show this help message"
 	@echo ""
 	@echo "This Makefile uses a native C++ lexer instead of Flex."
+

@@ -560,39 +560,6 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
     lastValue = builder.CreateCall(methodFunc, args, "method_result");
 }
 
-void LLVMCodegenVisitor::visit(IsNode& node) {
-
-    node.expression->accept(*this);
-    llvm::Value* exprValue = lastValue;
-    
-    if (!exprValue) {
-        std::cerr << "Error: Invalid expression in 'is' check" << std::endl;
-        lastValue = nullptr;
-        return;
-    }
-    
-
-    llvm::Type* exprType = exprValue->getType();
-    bool isMatch = false;
-    
-
-    if (node.typeName == "Number") {
-        isMatch = exprType->isIntegerTy() && !exprType->isIntegerTy(1);
-    } else if (node.typeName == "String") {
-
-        isMatch = exprType->isPointerTy();
-    } else if (node.typeName == "Boolean") {
-        isMatch = exprType->isIntegerTy(1);
-    } else if (node.typeName == "Object") {
-        isMatch = exprType->isPointerTy();
-    } else {
-
-        isMatch = exprType->isPointerTy();
-    }
-    
-    lastValue = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), isMatch ? 1 : 0);
-}
-
 void LLVMCodegenVisitor::visit(AsNode& node) {
 
     node.expression->accept(*this);
