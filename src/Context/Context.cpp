@@ -5,6 +5,7 @@ Context::Context() : parent(nullptr) {
     functions["sin"] = {"x"};
     functions["cos"] = {"x"};
     functions["sqrt"] = {"x"};
+    functions["rand"] = {};
 
 
     variables.insert("PI");

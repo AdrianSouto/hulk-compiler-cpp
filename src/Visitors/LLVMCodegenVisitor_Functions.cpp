@@ -183,8 +183,9 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
 void LLVMCodegenVisitor::visit(FuncCallNode& node) {
 
     if (node.identifier == "sqrt" || node.identifier == "sin" || node.identifier == "cos" || 
-        node.identifier == "exp" || node.identifier == "log" || node.identifier == "pow") {
-        
+        node.identifier == "exp" || node.identifier == "log" || node.identifier == "pow" ||
+        node.identifier == "rand") {
+
         llvm::Type* doubleTy = llvm::Type::getDoubleTy(ctx);
         std::vector<llvm::Value*> args;
         
@@ -223,6 +224,70 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
             return;
         }
         
+        if (node.identifier == "rand") {
+
+            if (!node.args.empty()) {
+                std::cerr << "Error: rand expects 0 arguments" << std::endl;
+                lastValue = nullptr;
+                return;
+            }
+            
+
+            static bool seeded = false;
+            if (!seeded) {
+
+                llvm::Function* srandFunc = module.getFunction("srand");
+                if (!srandFunc) {
+                    llvm::FunctionType* srandType = llvm::FunctionType::get(
+                        llvm::Type::getVoidTy(ctx), 
+                        {llvm::Type::getInt32Ty(ctx)}, 
+                        false
+                    );
+                    srandFunc = llvm::Function::Create(srandType, llvm::Function::ExternalLinkage, "srand", module);
+                }
+                
+
+                llvm::Function* timeFunc = module.getFunction("time");
+                if (!timeFunc) {
+                    llvm::FunctionType* timeType = llvm::FunctionType::get(
+                        llvm::Type::getInt64Ty(ctx), 
+                        {llvm::PointerType::get(llvm::Type::getInt64Ty(ctx), 0)}, 
+                        false
+                    );
+                    timeFunc = llvm::Function::Create(timeType, llvm::Function::ExternalLinkage, "time", module);
+                }
+                
+
+                llvm::Value* nullPtr = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt64Ty(ctx), 0));
+                llvm::Value* currentTime = builder.CreateCall(timeFunc, {nullPtr}, "current_time");
+                
+
+                llvm::Value* seed = builder.CreateTrunc(currentTime, llvm::Type::getInt32Ty(ctx), "seed");
+                
+
+                builder.CreateCall(srandFunc, {seed});
+                seeded = true;
+            }
+            
+            llvm::Function* randFunc = module.getFunction("rand");
+            if (!randFunc) {
+                llvm::FunctionType* randType = llvm::FunctionType::get(llvm::Type::getInt32Ty(ctx), false);
+                randFunc = llvm::Function::Create(randType, llvm::Function::ExternalLinkage, "rand", module);
+            }
+            
+
+            llvm::Value* randResult = builder.CreateCall(randFunc, {}, "rand_result");
+            
+
+            llvm::Value* ten = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 10);
+            llvm::Value* modResult = builder.CreateSRem(randResult, ten, "rand_mod_10");
+            
+
+            llvm::Value* one = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 1);
+            lastValue = builder.CreateAdd(modResult, one, "rand_1_to_10");
+            return;
+        }
+
 
         llvm::Function* mathFunc = nullptr;
         std::string intrinsicName;
@@ -240,7 +305,7 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
         } else if (node.identifier == "pow") {
             intrinsicName = "llvm.pow.f64";
         }
-        
+
         mathFunc = module.getFunction(intrinsicName);
         if (!mathFunc) {
             std::vector<llvm::Type*> paramTypes;
@@ -379,3 +444,4 @@ void LLVMCodegenVisitor::visit(BaseCallNode& node) {
     std::cerr << "Warning: Could not resolve base() call for type " << currentTypeName << std::endl;
     lastValue = builder.CreateGlobalStringPtr("");
 }
+

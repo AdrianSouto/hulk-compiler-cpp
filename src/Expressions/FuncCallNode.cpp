@@ -4,11 +4,30 @@
 #include "Globals.hpp"
 #include <iostream>
 #include <cmath>
+#include <cstdlib>
+#include <ctime>
 
 FuncCallNode::FuncCallNode(const std::string& id, const std::vector<ExpressionNode*>& arguments)
     : identifier(id), args(arguments) {}
 
 int FuncCallNode::evaluate() const {
+    
+    if (identifier == "rand") {
+        if (args.size() != 0) {
+            std::cerr << "Error: Function 'rand' expects 0 arguments, got " << args.size() << std::endl;
+            return 0;
+        }
+        
+
+        static bool seeded = false;
+        if (!seeded) {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            seeded = true;
+        }
+        
+
+        return (std::rand() % 10) + 1;
+    }
     
     if (identifier == "sin" || identifier == "cos" || identifier == "sqrt") {
         if (args.size() != 1) {
