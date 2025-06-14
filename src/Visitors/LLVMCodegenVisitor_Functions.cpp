@@ -47,8 +47,15 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
 
         if (param.name == "self" && !currentTypeName.empty()) {
 
-            paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-            std::cerr << "DEBUG: Setting 'self' parameter type to er for type '" << currentTypeName << "'" << std::endl;
+
+            extern std::map<std::string, llvm::StructType*> structTypes;
+            auto structIt = structTypes.find(currentTypeName);
+            if (structIt != structTypes.end()) {
+                paramType = llvm::PointerType::get(structIt->second, 0);
+            } else {
+                paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+            }
+            std::cerr << "DEBUG: Setting 'self' parameter type to pointer for type '" << currentTypeName << "'" << std::endl;
         }
         
         paramTypes.push_back(paramType);
