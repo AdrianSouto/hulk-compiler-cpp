@@ -560,53 +560,5 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
     lastValue = builder.CreateCall(methodFunc, args, "method_result");
 }
 
-void LLVMCodegenVisitor::visit(AsNode& node) {
 
-    node.expression->accept(*this);
-    llvm::Value* exprValue = lastValue;
-    
-    if (!exprValue) {
-        std::cerr << "Error: Invalid expression in 'as' cast" << std::endl;
-        lastValue = nullptr;
-        return;
-    }
-    
-    llvm::Type* exprType = exprValue->getType();
-    llvm::Type* targetType = getLLVMTypeFromName(node.typeName, ctx);
-    
 
-    if (exprType == targetType) {
-
-        lastValue = exprValue;
-    } else if (exprType->isIntegerTy() && targetType->isIntegerTy()) {
-
-        if (exprType->getIntegerBitWidth() < targetType->getIntegerBitWidth()) {
-            lastValue = builder.CreateZExt(exprValue, targetType, "int_extend");
-        } else if (exprType->getIntegerBitWidth() > targetType->getIntegerBitWidth()) {
-            lastValue = builder.CreateTrunc(exprValue, targetType, "int_trunc");
-        } else {
-            lastValue = exprValue;
-        }
-    } else if (exprType->isIntegerTy(1) && targetType->isIntegerTy()) {
-
-        lastValue = builder.CreateZExt(exprValue, targetType, "bool_to_int");
-    } else if (exprType->isIntegerTy() && targetType->isIntegerTy(1)) {
-
-        llvm::Value* zero = llvm::ConstantInt::get(exprType, 0);
-        lastValue = builder.CreateICmpNE(exprValue, zero, "int_to_bool");
-    } else if (exprType->isPointerTy() && targetType->isPointerTy()) {
-
-        lastValue = builder.CreateBitCast(exprValue, targetType, "ptr_cast");
-    } else {
-
-        std::cerr << "Warning: Potentially unsafe cast in 'as' operation from " 
-                  << exprType->getTypeID() << " to " << targetType->getTypeID() << std::endl;
-        
-
-        if (exprType->isPointerTy() && targetType->isPointerTy()) {
-            lastValue = builder.CreateBitCast(exprValue, targetType, "unsafe_cast");
-        } else {
-            lastValue = exprValue;
-        }
-    }
-}

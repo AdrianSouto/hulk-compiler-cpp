@@ -70,6 +70,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Literals.cpp \
               src/Visitors/LLVMCodegenVisitor_Logical.cpp \
               src/Visitors/LLVMCodegenVisitor_IsNode.cpp \
+              src/Visitors/LLVMCodegenVisitor_AsNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
