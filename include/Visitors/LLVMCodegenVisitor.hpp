@@ -31,6 +31,7 @@ class ConditionalNode;
 class AndNode;
 class OrNode;
 class NotNode;
+class UnaryMinusNode;
 class EqualNode;
 class NotEqualNode;
 class GreaterNode;
@@ -101,6 +102,7 @@ public:
     void visit(AndNode& node);
     void visit(OrNode& node);
     void visit(NotNode& node);
+    void visit(UnaryMinusNode& node);
     void visit(EqualNode& node);
     void visit(NotEqualNode& node);
     void visit(GreaterNode& node);

@@ -44,6 +44,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Expressions/MultiplicationNode.cpp \
               src/Expressions/NotEqualNode.cpp \
               src/Expressions/NotNode.cpp \
+              src/Expressions/UnaryMinusNode.cpp \
               src/Expressions/NumberNode.cpp \
               src/Expressions/OrNode.cpp \
               src/Expressions/PowerNode.cpp \

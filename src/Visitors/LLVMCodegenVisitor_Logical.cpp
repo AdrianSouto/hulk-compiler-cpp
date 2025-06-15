@@ -2,6 +2,7 @@
 #include "Expressions/AndNode.hpp"
 #include "Expressions/OrNode.hpp"
 #include "Expressions/NotNode.hpp"
+#include "Expressions/UnaryMinusNode.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Type.h>
@@ -33,4 +34,21 @@ void LLVMCodegenVisitor::visit(NotNode& node) {
     llvm::Value* v = lastValue;
     v = builder.CreateICmpEQ(v, llvm::ConstantInt::get(v->getType(), 0), "nottmp");
     lastValue = v;
+}
+
+void LLVMCodegenVisitor::visit(UnaryMinusNode& node) {
+    node.operand->accept(*this);
+    llvm::Value* v = lastValue;
+    
+    if (v->getType()->isIntegerTy()) {
+
+        lastValue = builder.CreateNeg(v, "negtmp");
+    } else if (v->getType()->isDoubleTy()) {
+
+        lastValue = builder.CreateFNeg(v, "fnegtmp");
+    } else {
+
+        llvm::Value* intVal = builder.CreatePtrToInt(v, llvm::Type::getInt32Ty(builder.getContext()), "ptrtoint");
+        lastValue = builder.CreateNeg(intVal, "negtmp");
+    }
 }

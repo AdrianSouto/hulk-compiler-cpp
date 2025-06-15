@@ -33,6 +33,7 @@
 #include "Expressions/AndNode.hpp"
 #include "Expressions/OrNode.hpp"
 #include "Expressions/NotNode.hpp"
+#include "Expressions/UnaryMinusNode.hpp"
 #include "Expressions/GreaterNode.hpp"
 #include "Expressions/GreaterEqNode.hpp"
 #include "Expressions/LessNode.hpp"

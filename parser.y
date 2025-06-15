@@ -451,6 +451,7 @@ expression:
     | expression AND expression { $$ = new AndNode($1, $3); }
     | expression OR expression { $$ = new OrNode($1, $3); }
     | NOT expression { $$ = new NotNode($2); }
+    | MINUS expression %prec NOT { $$ = new UnaryMinusNode($2); }
     | IDENTIFIER ASSIGN expression { $$ = new AssignmentNode($1, $3); free($1); }
     | postfix_expression ASSIGN expression { 
         if (auto memberAccess = dynamic_cast<MemberAccessNode*>($1)) {
