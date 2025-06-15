@@ -153,6 +153,17 @@ std::string FlexCompatibleLexer::readNumber() {
     while (!isAtEnd() && isDigit(peek())) {
         number += advance();
     }
+    
+
+    if (!isAtEnd() && peek() == '.') {
+        number += advance();
+        
+
+        while (!isAtEnd() && isDigit(peek())) {
+            number += advance();
+        }
+    }
+    
     return number;
 }
 
@@ -237,7 +248,13 @@ int FlexCompatibleLexer::getNextToken() {
             current_token = readNumber();
             yytext = const_cast<char*>(current_token.c_str());
             yyleng = current_token.length();
-            yylval.number = std::stoi(current_token);
+            
+
+            if (current_token.find('.') != std::string::npos) {
+                yylval.decimal = std::stod(current_token);
+            } else {
+                yylval.number = std::stoi(current_token);
+            }
             return NUMBER;
         }
         

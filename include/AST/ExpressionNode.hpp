@@ -7,6 +7,7 @@
 class ExpressionNode : public ASTNode {
 public:
     virtual int evaluate() const = 0;
+    virtual double evaluateDouble() const { return static_cast<double>(evaluate()); }
     virtual std::string evaluateString() const;
     void accept(LLVMCodegenVisitor& visitor) override = 0;
     ~ExpressionNode() override = default;

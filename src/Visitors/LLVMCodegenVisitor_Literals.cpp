@@ -8,7 +8,11 @@
 #include <llvm/IR/Type.h>
 
 void LLVMCodegenVisitor::visit(NumberNode& node) {
-    lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), node.value, true);
+    if (node.isInteger) {
+        lastValue = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), static_cast<int>(node.value), true);
+    } else {
+        lastValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), node.value);
+    }
 }
 
 void LLVMCodegenVisitor::visit(StringLiteralNode& node) {

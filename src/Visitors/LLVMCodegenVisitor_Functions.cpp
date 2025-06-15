@@ -16,7 +16,7 @@
 
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
-        return llvm::Type::getInt32Ty(ctx);
+        return llvm::Type::getDoubleTy(ctx);
     } else if (typeName == "String") {
         return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Boolean") {
@@ -63,7 +63,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
     }
     
 
-    llvm::Type* returnType = llvm::Type::getInt32Ty(ctx);
+    llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
     if (node.returnType) {
         returnType = getLLVMTypeFromName(node.returnType->toString(), ctx);
     } else {
@@ -156,6 +156,12 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
                     } else if (returnValue->getType()->getIntegerBitWidth() > returnType->getIntegerBitWidth()) {
                         returnValue = builder.CreateTrunc(returnValue, returnType, "int_trunc");
                     }
+                } else if (returnValue->getType()->isIntegerTy() && returnType->isDoubleTy()) {
+
+                    returnValue = builder.CreateSIToFP(returnValue, returnType, "int_to_double");
+                } else if (returnValue->getType()->isDoubleTy() && returnType->isIntegerTy()) {
+
+                    returnValue = builder.CreateFPToSI(returnValue, returnType, "double_to_int");
                 } else if (returnValue->getType()->isPointerTy() && returnType->isPointerTy()) {
                     returnValue = builder.CreateBitCast(returnValue, returnType, "ptr_cast");
                 }
@@ -170,6 +176,8 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
             llvm::Value* defaultRet = nullptr;
             if (returnType->isIntegerTy()) {
                 defaultRet = llvm::ConstantInt::get(returnType, 0);
+            } else if (returnType->isDoubleTy()) {
+                defaultRet = llvm::ConstantFP::get(returnType, 0.0);
             } else if (returnType->isPointerTy()) {
                 defaultRet = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(returnType));
             }
@@ -337,7 +345,7 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
         if (mathFunc) {
             llvm::Value* result = builder.CreateCall(mathFunc, args, node.identifier + "_result");
 
-            lastValue = builder.CreateFPToSI(result, llvm::Type::getInt32Ty(ctx), "math_to_int");
+            lastValue = result;
         } else {
             lastValue = nullptr;
         }
@@ -383,6 +391,12 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
                 } else if (argVal->getType()->getIntegerBitWidth() > expectedType->getIntegerBitWidth()) {
                     argVal = builder.CreateTrunc(argVal, expectedType, "arg_int_trunc");
                 }
+            } else if (argVal->getType()->isIntegerTy() && expectedType->isDoubleTy()) {
+
+                argVal = builder.CreateSIToFP(argVal, expectedType, "arg_int_to_double");
+            } else if (argVal->getType()->isDoubleTy() && expectedType->isIntegerTy()) {
+
+                argVal = builder.CreateFPToSI(argVal, expectedType, "arg_double_to_int");
             } else if (argVal->getType()->isPointerTy() && expectedType->isPointerTy()) {
                 argVal = builder.CreateBitCast(argVal, expectedType, "arg_ptr_cast");
             }

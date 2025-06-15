@@ -29,6 +29,7 @@ extern char* yytext;
 
 %union {
     int number;
+    double decimal;
     char* string;
     ExpressionNode* expression;
     StatementNode* statement;
@@ -657,7 +658,15 @@ postfix_expression:
     ;
 
 primary_expression:
-    NUMBER { $$ = new NumberNode($1); }
+    NUMBER { 
+
+        std::string token_str(yytext);
+        if (token_str.find('.') != std::string::npos) {
+            $$ = new NumberNode(yylval.decimal);
+        } else {
+            $$ = new NumberNode($1);
+        }
+    }
     | STRING { $$ = new StringLiteralNode($1); }
     | TRUE { $$ = new BooleanNode(true); }
     | FALSE { $$ = new BooleanNode(false); }
