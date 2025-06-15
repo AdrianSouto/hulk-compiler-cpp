@@ -215,6 +215,18 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     builder.CreateStore(llvm::ConstantInt::get(intType, 0), resultVar);
 
 
+    if (startValue->getType() != intType) {
+        if (startValue->getType()->isDoubleTy()) {
+            startValue = builder.CreateFPToSI(startValue, intType, "start_to_int");
+        } else if (startValue->getType()->isIntegerTy()) {
+            if (startValue->getType()->getIntegerBitWidth() < intType->getIntegerBitWidth()) {
+                startValue = builder.CreateZExt(startValue, intType, "start_extend");
+            } else if (startValue->getType()->getIntegerBitWidth() > intType->getIntegerBitWidth()) {
+                startValue = builder.CreateTrunc(startValue, intType, "start_trunc");
+            }
+        }
+    }
+
     builder.CreateStore(startValue, loopVar);
 
 
@@ -229,6 +241,18 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
 
     builder.SetInsertPoint(condBB);
     llvm::Value* currentVar = builder.CreateLoad(intType, loopVar, "loop.var");
+
+    if (endValue->getType() != intType) {
+        if (endValue->getType()->isDoubleTy()) {
+            endValue = builder.CreateFPToSI(endValue, intType, "end_to_int");
+        } else if (endValue->getType()->isIntegerTy()) {
+            if (endValue->getType()->getIntegerBitWidth() < intType->getIntegerBitWidth()) {
+                endValue = builder.CreateZExt(endValue, intType, "end_extend");
+            } else if (endValue->getType()->getIntegerBitWidth() > intType->getIntegerBitWidth()) {
+                endValue = builder.CreateTrunc(endValue, intType, "end_trunc");
+            }
+        }
+    }
     llvm::Value* cond = builder.CreateICmpSLT(currentVar, endValue, "for.cond");
     builder.CreateCondBr(cond, bodyBB, afterBB);
 
