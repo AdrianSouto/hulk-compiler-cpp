@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude -fexceptions
 LLVM_CONFIG = llvm-config
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions')
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions/-fexceptions/g')
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
 
@@ -76,19 +76,20 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
-              src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp \
-              src/Lexer/FlexCompatibleLexer.cpp
+              src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp
 
 MAIN_SOURCE = main.cpp
 
 
 PARSER_SOURCE = hulk/parser.cpp
 PARSER_HEADER = hulk/parser.hpp
+LEXER_SOURCE = hulk/lexer.cpp
 
 
 OBJECTS = $(CPP_SOURCES:src/%.cpp=build/%.o)
 MAIN_OBJECT = build/main.o
 PARSER_OBJECT = build/parser.o
+LEXER_OBJECT = build/lexer.o
 
 
 TARGET = hulk/hulk_compiler.exe
@@ -106,8 +107,8 @@ compile: $(TARGET)
 	@echo "Compilation completed with native lexer. Artifacts stored in hulk/"
 
 
-$(TARGET): $(HULK_DIR) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LLVM_LDFLAGS)
+$(TARGET): $(HULK_DIR) $(LEXER_SOURCE) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT) $(LLVM_LDFLAGS)
 	@echo "Copying additional artifacts to hulk/"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
 	@echo "Hulk compiler with native lexer built successfully in hulk/"
@@ -115,6 +116,16 @@ $(TARGET): $(HULK_DIR) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJEC
 
 $(HULK_DIR):
 	@mkdir -p hulk
+
+
+$(LEXER_SOURCE): lexer_definition.txt lexer/lexer_generator | $(HULK_DIR)
+	@echo "Generating lexer from definition..."
+	./lexer/lexer_generator lexer_definition.txt $(LEXER_SOURCE)
+
+
+lexer/lexer_generator: lexer/lexer_generator.cpp
+	@echo "Building lexer generator..."
+	$(CXX) -std=c++17 -o lexer/lexer_generator lexer/lexer_generator.cpp
 
 
 $(PARSER_SOURCE) $(PARSER_HEADER): parser.y | $(HULK_DIR)
@@ -139,6 +150,8 @@ $(MAIN_OBJECT): $(MAIN_SOURCE) $(PARSER_HEADER) | $(BUILD_DIR)
 $(PARSER_OBJECT): $(PARSER_SOURCE) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
+$(LEXER_OBJECT): $(LEXER_SOURCE) $(PARSER_HEADER) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
 build/%.o: src/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
@@ -161,16 +174,17 @@ execute: force-regenerate $(TARGET)
 
 
 force-regenerate:
-	@echo "Forcing regeneration of parser files..."
+	@echo "Forcing regeneration of parser and lexer files..."
 	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
-	@rm -f $(PARSER_OBJECT)
+	@rm -f $(LEXER_SOURCE)
+	@rm -f $(PARSER_OBJECT) $(LEXER_OBJECT)
 
 
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf build
 	@rm -rf hulk
-	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
+	@rm -f lexer/lexer_generator lexer/lexer_generator.exe
 	@rm -f output.ll output.s output_exec output_exec.exe
 	@echo "Clean completed."
 

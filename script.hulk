@@ -1,5 +1,15 @@
-let number = 42 in (
-    let text = "The meaning of life is" in (
-            print(text @ number)
-        )
+type Bird {
+}
+
+type Plane {
+}
+
+type Superman {
+}
+
+let x = new Superman() in
+    print(
+        if (x is Bird) "It's bird!"
+        elif (x is Plane) "It's a plane!"
+        else "No, it's Superman!"
     );
