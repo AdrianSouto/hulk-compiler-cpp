@@ -4,12 +4,16 @@ LLVM_CONFIG = llvm-config
 LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions')
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
-
 SRC_DIR = src
 INCLUDE_DIR = include
 BUILD_DIR = build
 HULK_DIR = hulk
+LEXER_DIR = lexer
 
+# Lexer generator
+LEXER_GENERATOR = $(LEXER_DIR)/lexer_generator.exe
+LEXER_SOURCE = $(HULK_DIR)/lexer.cpp
+LEXER_HEADER = $(HULK_DIR)/lexer.hpp
 
 CPP_SOURCES = src/AST/ASTNode.cpp \
               src/AST/Attribute.cpp \
@@ -76,50 +80,48 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
-              src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp \
-              src/Lexer/FlexCompatibleLexer.cpp
+              src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp
 
 MAIN_SOURCE = main.cpp
-
 
 PARSER_SOURCE = hulk/parser.cpp
 PARSER_HEADER = hulk/parser.hpp
 
-
 OBJECTS = $(CPP_SOURCES:src/%.cpp=build/%.o)
 MAIN_OBJECT = build/main.o
 PARSER_OBJECT = build/parser.o
-
+LEXER_OBJECT = build/lexer.o
 
 TARGET = hulk/hulk_compiler.exe
-
 
 INPUT_FILE = script.hulk
 
 .PHONY: all compile execute clean force-regenerate
 
-
 all: compile
 
-
 compile: $(TARGET)
-	@echo "Compilation completed with native lexer. Artifacts stored in hulk/"
+	@echo "Compilation completed with generated lexer. Artifacts stored in hulk/"
 
-
-$(TARGET): $(HULK_DIR) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT)
-	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LLVM_LDFLAGS)
+$(TARGET): $(HULK_DIR) $(LEXER_SOURCE) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT) $(LLVM_LDFLAGS)
 	@echo "Copying additional artifacts to hulk/"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
-	@echo "Hulk compiler with native lexer built successfully in hulk/"
-
+	@echo "Hulk compiler with generated lexer built successfully in hulk/"
 
 $(HULK_DIR):
 	@mkdir -p hulk
 
+$(LEXER_GENERATOR): $(LEXER_DIR)/SimpleLexerGenerator.cpp
+	@echo "Building lexer generator..."
+	@cd $(LEXER_DIR) && $(MAKE)
+
+$(LEXER_SOURCE) $(LEXER_HEADER): $(LEXER_GENERATOR) lexer.l parser.y | $(HULK_DIR)
+	@echo "Generating lexer from lexer.l..."
+	@cd $(LEXER_DIR) && ./lexer_generator.exe
 
 $(PARSER_SOURCE) $(PARSER_HEADER): parser.y | $(HULK_DIR)
 	bison -d -o $(PARSER_SOURCE) parser.y
-
 
 $(BUILD_DIR):
 	@mkdir -p build
@@ -129,25 +131,22 @@ $(BUILD_DIR):
 	@mkdir -p build/Statements
 	@mkdir -p build/Types
 	@mkdir -p build/Visitors
-	@mkdir -p build/Lexer
 
-
-$(MAIN_OBJECT): $(MAIN_SOURCE) $(PARSER_HEADER) | $(BUILD_DIR)
+$(MAIN_OBJECT): $(MAIN_SOURCE) $(PARSER_HEADER) $(LEXER_HEADER) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
-
 
 $(PARSER_OBJECT): $(PARSER_SOURCE) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
+$(LEXER_OBJECT): $(LEXER_SOURCE) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
 build/%.o: src/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
-
-
 execute: force-regenerate $(TARGET)
-	@echo "--- Running Hulk Compiler Workflow with Native Lexer ---"
+	@echo "--- Running Hulk Compiler Workflow with Generated Lexer ---"
 	@cd hulk && \
 	    echo "Step 1: Generating LLVM IR (./hulk_compiler.exe $(INPUT_FILE) -> output.ll)..." && \
 	    ./hulk_compiler.exe $(INPUT_FILE) && \
@@ -157,30 +156,30 @@ execute: force-regenerate $(TARGET)
 	    $(CXX) output.s -o output_exec -lm && \
 	    echo "Step 4: Executing the generated program (./output_exec)..." && \
 	    ./output_exec
-	@echo "--- Hulk Compiler Workflow with Native Lexer Completed ---"
-
+	@echo "--- Hulk Compiler Workflow with Generated Lexer Completed ---"
 
 force-regenerate:
-	@echo "Forcing regeneration of parser files..."
+	@echo "Forcing regeneration of parser and lexer files..."
 	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
-	@rm -f $(PARSER_OBJECT)
-
+	@rm -f $(LEXER_SOURCE) $(LEXER_HEADER)
+	@rm -f $(PARSER_OBJECT) $(LEXER_OBJECT)
 
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf build
 	@rm -rf hulk
 	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
+	@rm -f $(LEXER_SOURCE) $(LEXER_HEADER)
 	@rm -f output.ll output.s output_exec output_exec.exe
+	@cd $(LEXER_DIR) && $(MAKE) clean
 	@echo "Clean completed."
-
 
 help:
 	@echo "Available targets:"
-	@echo "  compile  - Compile the Hulk compiler with native lexer and generate hulk/ directory"
+	@echo "  compile  - Compile the Hulk compiler with generated lexer and generate hulk/ directory"
 	@echo "  execute  - Execute the compiled Hulk program (depends on compile)"
 	@echo "  clean    - Remove all build artifacts"
 	@echo "  help     - Show this help message"
 	@echo ""
-	@echo "This Makefile uses a native C++ lexer instead of Flex."
+	@echo "This Makefile uses a generated lexer from lexer.l similar to Flex."
 

@@ -4,6 +4,7 @@
 #include "Globals.hpp"
 
 #include "hulk/parser.hpp"
+#include "hulk/lexer.hpp"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -11,31 +12,37 @@
 #include <llvm/Support/FileSystem.h> 
 #include <Visitors/LLVMCodegenVisitor.hpp>
 
-extern FILE* yyin;
 extern int yyparse();
 extern Program program;
 
 int main(int argc, char* argv[]) {
     const char* filename = "../script.hulk";
     
-    
     if (argc > 1) {
         filename = argv[1];
     }
 
     std::cout << "DEBUG: Opening file: " << filename << std::endl;
-    yyin = fopen(filename, "r");
-    if (!yyin) {
+    
+    // Read the file content
+    std::ifstream file(filename);
+    if (!file.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;
         return 1;
     }
+    
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Set input for our generated lexer
+    setInput(content);
     
     std::cout << "DEBUG: Starting parsing..." << std::endl;
     int parseResult = yyparse();
     std::cout << "DEBUG: Parse result: " << parseResult << std::endl;
     if (parseResult != 0) {
         std::cerr << "Error de análisis sintáctico. No se pudo procesar el programa." << std::endl;
-        fclose(yyin);
         return 1;
     }
 
@@ -52,7 +59,6 @@ int main(int argc, char* argv[]) {
             llvm::IRBuilder<> builder(context);
             llvm::Module module("hulk_module", context);
 
-            
             LLVMCodegenVisitor codegenVisitor(context, builder, module);
 
             try {
@@ -66,30 +72,24 @@ int main(int argc, char* argv[]) {
                 llvm::raw_fd_ostream dest("output.ll", EC, llvm::sys::fs::OF_None);
                 if (EC) {
                     llvm::errs() << "Could not open file: " << EC.message();
-                    fclose(yyin);
                     return 1;
                 }
                 module.print(dest, nullptr);
                 std::cout << "LLVM IR generated to output.ll" << std::endl;
 
-                
-                fclose(yyin);
                 return 0;
                 
             } catch (const std::exception& e) {
                 std::cerr << "Error durante la generación de código LLVM: " << e.what() << std::endl;
-                fclose(yyin);
                 return 1;
             }
         } else {
             std::cerr << "Error de validación del programa: " << program.getErrorMessage() << std::endl;
-            fclose(yyin); 
             return 1;
         }
     } else {
         std::cerr << "No hay declaraciones en el programa. El archivo podría estar vacío o contener errores de sintaxis." << std::endl;
     }
 
-    fclose(yyin);
     return 0;
 }
