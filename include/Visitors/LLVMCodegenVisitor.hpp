@@ -53,6 +53,7 @@ class MemberAccessNode;
 class MethodCallNode;
 class IsNode;
 class AsNode;
+class PrintExpressionNode;
 
 class LLVMCodegenVisitor {
 public:
@@ -124,6 +125,7 @@ public:
     void visit(MethodCallNode& node);
     void visit(IsNode& node);
     void visit(AsNode& node);
+    void visit(PrintExpressionNode& node);
 };
 
 #endif

@@ -673,6 +673,18 @@ primary_expression:
     | FALSE { $$ = new BooleanNode(false); }
     | IDENTIFIER { $$ = new VariableNode($1); }
     | LPAREN expression RPAREN { $$ = $2; }
+    | LPAREN statement RPAREN { 
+        if (auto* exprStmt = dynamic_cast<ExpressionStatementNode*>($2)) {
+            $$ = exprStmt->expression;
+        } else if (auto* printStmt = dynamic_cast<PrintStatementNode*>($2)) {
+
+            $$ = new PrintExpressionNode(printStmt->expression);
+            printStmt->expression = nullptr;
+            delete printStmt;
+        } else {
+            $$ = new NumberNode(0);
+        }
+    }
     | NEW IDENTIFIER LPAREN expression_list RPAREN {
         $$ = new TypeInstantiationNode($2, *$4);
         delete $4;

@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude -fexceptions
 LLVM_CONFIG = llvm-config
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions)
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions')
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
 
@@ -62,6 +62,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Statements/LetVarNode.cpp \
               src/Statements/PrintStatementNode.cpp \
               src/Statements/TypeDefNode.cpp \
+              src/Expressions/PrintExpressionNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Arithmetic.cpp \
               src/Visitors/LLVMCodegenVisitor_Comparison.cpp \
               src/Visitors/LLVMCodegenVisitor_Control.cpp \
@@ -75,6 +76,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
+              src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp \
               src/Lexer/FlexCompatibleLexer.cpp
 
 MAIN_SOURCE = main.cpp

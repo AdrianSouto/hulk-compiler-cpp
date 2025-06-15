@@ -53,6 +53,7 @@
 #include "Statements/TypeDefNode.hpp"
 #include "Statements/LetVarNode.hpp"
 #include "Statements/PrintStatementNode.hpp"
+#include "Expressions/PrintExpressionNode.hpp"
 #include "Statements/BlockNode.hpp"
 #include "Statements/ExpressionStatementNode.hpp"
 
