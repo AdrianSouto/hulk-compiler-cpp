@@ -3,6 +3,8 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
 #include "AST/StatementNode.hpp"
+#include "Statements/ExpressionStatementNode.hpp"
+#include "Expressions/AssignmentNode.hpp"
 #include <iostream>
 
 ForRangeNode::ForRangeNode(const std::string& var, ExpressionNode* start, ExpressionNode* end, ASTNode* b)
@@ -29,7 +31,16 @@ int ForRangeNode::evaluate() const {
             lastValue = exprBody->evaluate();
         } else if (auto* stmtBody = dynamic_cast<StatementNode*>(body)) {
             stmtBody->execute();
-            lastValue = 0; 
+
+
+            if (auto* exprStmt = dynamic_cast<ExpressionStatementNode*>(stmtBody)) {
+                if (auto* assignExpr = dynamic_cast<AssignmentNode*>(exprStmt->expression)) {
+
+                    if (variables.find(assignExpr->identifier) != variables.end()) {
+                        lastValue = std::stoi(variables[assignExpr->identifier]);
+                    }
+                }
+            }
         }
     }
     

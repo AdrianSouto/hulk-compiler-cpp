@@ -208,6 +208,11 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
     llvm::Type* intType = llvm::Type::getInt32Ty(ctx);
     llvm::AllocaInst* loopVar = createEntryBlockAlloca(function, intType, node.loopVar);
+    
+
+    llvm::AllocaInst* resultVar = createEntryBlockAlloca(function, intType, "for.result");
+
+    builder.CreateStore(llvm::ConstantInt::get(intType, 0), resultVar);
 
 
     builder.CreateStore(startValue, loopVar);
@@ -237,6 +242,10 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
 
     if (node.body) {
         node.body->accept(*this);
+
+        if (lastValue && lastValue->getType() == intType) {
+            builder.CreateStore(lastValue, resultVar);
+        }
     }
 
 
@@ -259,5 +268,5 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     builder.SetInsertPoint(afterBB);
 
 
-    lastValue = nullptr;
+    lastValue = builder.CreateLoad(intType, resultVar, "for.final.result");
 }

@@ -95,6 +95,18 @@ bool DefFuncNode::validate(IContext* context) {
         return false;
     }
 
+
+
+    if (!context->Define(identifier, paramNames)) {
+        errorMessage = "Error: Function '" + identifier + "' with " +
+                       std::to_string(parameters.size()) + " arguments is already defined";
+        delete innerContext;
+        return false;
+    }
+
+
+    innerContext->Define(identifier, paramNames);
+
     if (isBlockBody) {
 
         for (auto stmt : statements) {
@@ -114,13 +126,6 @@ bool DefFuncNode::validate(IContext* context) {
     }
 
     if (!validateReturnType(innerContext)) {
-        delete innerContext;
-        return false;
-    }
-
-    if (!context->Define(identifier, paramNames)) {
-        errorMessage = "Error: Function '" + identifier + "' with " +
-                       std::to_string(parameters.size()) + " arguments is already defined";
         delete innerContext;
         return false;
     }
