@@ -65,8 +65,6 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
         } else {
 
 
-
-
         }
         builder.CreateBr(afterBlock);
     }
@@ -100,15 +98,13 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
 
     if (!valueProducingBlocks.empty()) {
 
-
         llvm::Type* phiType = valueProducingBlocks[0].second->getType();
         bool allSameType = true;
         for (const auto& vb : valueProducingBlocks) {
             if (vb.second->getType() != phiType) {
                 allSameType = false;
 
-
-
+                phiType = llvm::Type::getDoubleTy(ctx);
                 break;
             }
         }
@@ -116,20 +112,32 @@ void LLVMCodegenVisitor::visit(ConditionalNode& node) {
         if (allSameType || valueProducingBlocks.size() == 1) {
             llvm::PHINode* phi = builder.CreatePHI(phiType, valueProducingBlocks.size(), "iftmp");
             for (auto& vb : valueProducingBlocks) {
-                phi->addIncoming(vb.second, vb.first);
+                llvm::Value* value = vb.second;
+
+                if (value->getType() != phiType) {
+                    if (value->getType()->isIntegerTy() && phiType->isDoubleTy()) {
+                        value = builder.CreateSIToFP(value, phiType, "int_to_double");
+                    } else if (value->getType()->isDoubleTy() && phiType->isIntegerTy()) {
+                        value = builder.CreateFPToSI(value, phiType, "double_to_int");
+                    }
+                }
+                phi->addIncoming(value, vb.first);
             }
             lastValue = phi;
         } else {
 
+            llvm::PHINode* phi = builder.CreatePHI(phiType, valueProducingBlocks.size(), "iftmp");
+            for (auto& vb : valueProducingBlocks) {
+                llvm::Value* value = vb.second;
 
-            lastValue = llvm::UndefValue::get(phiType);
+                if (value->getType()->isIntegerTy()) {
+                    value = builder.CreateSIToFP(value, phiType, "int_to_double");
+                }
+                phi->addIncoming(value, vb.first);
+            }
+            lastValue = phi;
         }
     } else {
-
-
-
-
-
 
 
         lastValue = nullptr;
