@@ -1,5 +1,6 @@
 #include "Expressions/VariableNode.hpp"
 #include "Context/IContext.hpp"
+#include "Types/Type.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
 #include <iostream>
@@ -49,6 +50,13 @@ bool VariableNode::validate(IContext* context) {
         return false;
     }
     return true;
+}
+
+Type* VariableNode::inferType(IContext* context) const {
+
+
+    (void)context;
+    return Type::getNumberType();
 }
 
 void VariableNode::accept(LLVMCodegenVisitor& visitor) {

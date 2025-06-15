@@ -1,4 +1,5 @@
 #include "Expressions/StringLiteralNode.hpp"
+#include "Types/Type.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include <iostream>
 
@@ -21,6 +22,11 @@ void StringLiteralNode::print(int indent) const {
         std::cout << "  ";
     }
     std::cout << "String: \"" << value << "\"" << std::endl;
+}
+
+Type* StringLiteralNode::inferType(IContext* context) const {
+    (void)context;
+    return Type::getStringType();
 }
 
 void StringLiteralNode::accept(LLVMCodegenVisitor& visitor) {

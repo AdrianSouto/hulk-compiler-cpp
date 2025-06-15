@@ -1,4 +1,6 @@
 #include "Context/Context.hpp"
+#include "AST/Parameter.hpp"
+#include "Types/Type.hpp"
 
 Context::Context() : parent(nullptr) {
 
@@ -7,6 +9,11 @@ Context::Context() : parent(nullptr) {
     functions["sqrt"] = {"x"};
     functions["rand"] = {};
 
+
+    functionSignatures.emplace("sin", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
+    functionSignatures.emplace("cos", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
+    functionSignatures.emplace("sqrt", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
+    functionSignatures.emplace("rand", FunctionSignature({}, Type::getNumberType()));
 
     variables.insert("PI");
 }
@@ -42,6 +49,48 @@ bool Context::Define(const std::string& function, const std::vector<std::string>
     }
     functions[function] = args;
     return true;
+}
+
+bool Context::DefineFunction(const std::string& function, const std::vector<Parameter>& params, Type* returnType) {
+
+    std::vector<std::string> paramNames;
+    std::vector<Type*> paramTypes;
+    
+    for (const auto& param : params) {
+        paramNames.push_back(param.name);
+
+        Type* paramType = param.type ? param.type : Type::getNumberType();
+        paramTypes.push_back(paramType);
+    }
+    
+
+    Type* retType = returnType ? returnType : Type::getNumberType();
+    
+
+    auto it = functionSignatures.find(function);
+    if (it != functionSignatures.end()) {
+        functionSignatures.erase(it);
+    }
+    functionSignatures.emplace(function, FunctionSignature(paramTypes, retType));
+    
+    return true;
+}
+
+FunctionSignature* Context::GetFunctionSignature(const std::string& function, int args) {
+    auto it = functionSignatures.find(function);
+    if (it != functionSignatures.end() && it->second.parameterTypes.size() == args) {
+        return &it->second;
+    }
+    
+
+    if (parent != nullptr) {
+        Context* parentContext = dynamic_cast<Context*>(parent);
+        if (parentContext) {
+            return parentContext->GetFunctionSignature(function, args);
+        }
+    }
+    
+    return nullptr;
 }
 
 IContext* Context::CreateChildContext() {

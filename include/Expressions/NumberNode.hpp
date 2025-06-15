@@ -3,6 +3,8 @@
 
 #include "AST/ExpressionNode.hpp"
 
+class Type;
+
 class NumberNode : public ExpressionNode {
 public:
     double value;
@@ -15,6 +17,7 @@ public:
     double evaluateDouble() const override;
     void print(int indent = 0) const override;
     bool validate(IContext* context) override { (void)context; return true; }
+    Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;
 };
 

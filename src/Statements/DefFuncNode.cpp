@@ -1,5 +1,6 @@
 #include "Statements/DefFuncNode.hpp"
 #include "Context/IContext.hpp"
+#include "Context/Context.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
 #include "Expressions/NumberNode.hpp"
@@ -102,6 +103,13 @@ bool DefFuncNode::validate(IContext* context) {
                        std::to_string(parameters.size()) + " arguments is already defined";
         delete innerContext;
         return false;
+    }
+
+
+    Context* ctx = dynamic_cast<Context*>(context);
+    if (ctx) {
+        Type* retType = returnType ? returnType : Type::getNumberType();
+        ctx->DefineFunction(identifier, parameters, retType);
     }
 
 

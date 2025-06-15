@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+class Type;
+
 class FuncCallNode : public ExpressionNode {
 public:
     std::string identifier;
@@ -15,6 +17,7 @@ public:
     int evaluate() const override;
     void print(int indent = 0) const override;
     bool validate(IContext* context) override;
+    Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;
     ~FuncCallNode();
 };

@@ -1,4 +1,5 @@
 #include "Expressions/NumberNode.hpp"
+#include "Types/Type.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include <iostream>
 #include <cmath>
@@ -24,6 +25,11 @@ void NumberNode::print(int indent) const {
     } else {
         std::cout << "Number: " << value << std::endl;
     }
+}
+
+Type* NumberNode::inferType(IContext* context) const {
+    (void)context;
+    return Type::getNumberType();
 }
 
 void NumberNode::accept(LLVMCodegenVisitor& visitor) {
