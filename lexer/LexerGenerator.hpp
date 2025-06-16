@@ -1,46 +1,33 @@
 #ifndef LEXER_GENERATOR_HPP
 #define LEXER_GENERATOR_HPP
 
+#include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <map>
-#include <regex>
+#include <sstream>
 
-struct LexerRule {
+struct TokenRule {
     std::string pattern;
     std::string action;
-    bool isRegex;
-    int priority;
+    std::string token_name;
+    bool ignore;
 };
 
-struct LexerDefinition {
-    std::string headerCode;
-    std::vector<std::string> options;
-    std::vector<LexerRule> rules;
-    std::string userCode;
-};
-
-class LexerGenerator {
+class FixedLexerGenerator {
 private:
-    LexerDefinition definition;
-    std::map<std::string, std::string> tokenMap;
+    std::vector<std::string> includes;
+    std::vector<TokenRule> rules;
     
-    void parseDefinitionSection(const std::string& content);
-    void parseRulesSection(const std::string& content);
-    void parseUserCodeSection(const std::string& content);
-    
-    std::string generateTokenEnum();
-    std::string generateLexerClass();
-    std::string generateLexerImplementation();
-    
-    std::string escapeString(const std::string& str);
-    std::string convertFlexPatternToRegex(const std::string& pattern);
-    bool isStringLiteral(const std::string& pattern);
+    std::string escapeForCpp(const std::string& str);
+    std::string escapeAction(const std::string& action);
+    std::string formatTokenAction(const std::string& action);
     
 public:
-    bool parseFlexFile(const std::string& filename);
-    bool generateLexer(const std::string& headerFile, const std::string& sourceFile);
-    void extractTokensFromParser(const std::string& parserFile);
+    bool parseDefinitionFile(const std::string& filename);
+    void parseRule(const std::string& line);
+    void generateLexer(const std::string& output_filename);
 };
 
 #endif // LEXER_GENERATOR_HPP

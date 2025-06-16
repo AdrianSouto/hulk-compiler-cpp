@@ -1,0 +1,53 @@
+%{
+#include "../include/AllHeaders.hpp"
+%}
+
+%%
+"print" { return PRINT; }
+"let" { return LET; }
+"in" { return IN; }
+"function" { return FUNCTION; }
+"type" { return TYPE; }
+"inherits" { return INHERITS; }
+"base" { return BASE; }
+"new" { return NEW; }
+"if" { return IF; }
+"elif" { return ELIF; }
+"else" { return ELSE; }
+"while" { return WHILE; }
+"for" { return FOR; }
+"is" { return IS; }
+"as" { return AS; }
+"true" { return TRUE; }
+"false" { return FALSE; }
+"Number" { return TYPE_NUMBER; }
+"String" { return TYPE_STRING; }
+"Boolean" { return TYPE_BOOLEAN; }
+"=>" { return ARROW; }
+":=" { return ASSIGN; }
+"==" { return EQEQ; }
+"!=" { return NOTEQ; }
+"<=" { return LESSEQ; }
+">=" { return GREATEREQ; }
+"@@" { return CONCAT_SPACE; }
+"@" { return CONCAT; }
+";" { return SEMICOLON; }
+"=" { return EQUALS; }
+"," { return COMMA; }
+":" { return COLON; }
+"(" { return LPAREN; }
+")" { return RPAREN; }
+"+" { return PLUS; }
+"-" { return MINUS; }
+"*" { return MULTIPLY; }
+"/" { return DIVIDE; }
+"%" { return MODULO; }
+"^" { return POWER; }
+"{" { return LBRACE; }
+"}" { return RBRACE; }
+"<" { return LESS; }
+">" { return GREATER; }
+"&" { return AND; }
+"|" { return OR; }
+"!" { return NOT; }
+"." { return DOT; }

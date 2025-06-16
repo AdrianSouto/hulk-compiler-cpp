@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
     file.close();
     
     // Set input for our generated lexer
-    setInput(content);
+    set_input(content);
     
     std::cout << "DEBUG: Starting parsing..." << std::endl;
     int parseResult = yyparse();

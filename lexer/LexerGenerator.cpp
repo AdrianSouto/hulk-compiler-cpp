@@ -1,542 +1,529 @@
 #include "LexerGenerator.hpp"
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <algorithm>
-#include <cctype>
 
-bool LexerGenerator::parseFlexFile(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Error: Cannot open file " << filename << std::endl;
-        return false;
+std::string FixedLexerGenerator::escapeForCpp(const std::string& str) {
+        std::string result;
+        for (char c : str) {
+            switch (c) {
+                case '"': result += "\\\""; break;
+                case '\\': result += "\\\\"; break;
+                case '\n': result += "\\n"; break;
+                case '\t': result += "\\t"; break;
+                case '\r': result += "\\r"; break;
+                case '<': result += "<"; break;  // Don't escape < in printf format strings
+                case '>': result += ">"; break;  // Don't escape > in printf format strings
+                default: result += c; break;
+            }
+        }
+        return result;
     }
     
-    std::string content((std::istreambuf_iterator<char>(file)),
-                        std::istreambuf_iterator<char>());
-    file.close();
-    
-    // Find the three sections separated by %%
-    size_t firstSeparator = content.find("%%");
-    if (firstSeparator == std::string::npos) {
-        std::cerr << "Error: Invalid flex file format - missing first %%" << std::endl;
-        return false;
-    }
-    
-    size_t secondSeparator = content.find("%%", firstSeparator + 2);
-    if (secondSeparator == std::string::npos) {
-        std::cerr << "Error: Invalid flex file format - missing second %%" << std::endl;
-        return false;
-    }
-    
-    // Parse sections
-    std::string definitionSection = content.substr(0, firstSeparator);
-    std::string rulesSection = content.substr(firstSeparator + 2, 
-                                             secondSeparator - firstSeparator - 2);
-    std::string userCodeSection = content.substr(secondSeparator + 2);
-    
-    parseDefinitionSection(definitionSection);
-    parseRulesSection(rulesSection);
-    parseUserCodeSection(userCodeSection);
-    
-    return true;
-}
-
-void LexerGenerator::parseDefinitionSection(const std::string& content) {
-    std::istringstream stream(content);
-    std::string line;
-    bool inHeaderCode = false;
-    
-    while (std::getline(stream, line)) {
-        // Trim whitespace
-        line.erase(0, line.find_first_not_of(" \t"));
-        line.erase(line.find_last_not_of(" \t") + 1);
+std::string FixedLexerGenerator::escapeAction(const std::string& action) {
+        std::string result;
+        size_t start = 0;
+        size_t quote_pos = action.find('"');
         
-        if (line.empty()) continue;
-        
-        if (line == "%{") {
-            inHeaderCode = true;
-            continue;
-        } else if (line == "%}") {
-            inHeaderCode = false;
-            continue;
+        while (quote_pos != std::string::npos) {
+            // Add everything before the quote
+            result += action.substr(start, quote_pos - start);
+            
+            // Find the end of the quoted string
+            size_t end_quote = action.find('"', quote_pos + 1);
+            if (end_quote == std::string::npos) {
+                // Unmatched quote, just add the rest
+                result += action.substr(quote_pos);
+                break;
+            }
+            
+            // Extract the string inside quotes
+            std::string quoted = action.substr(quote_pos + 1, end_quote - quote_pos - 1);
+            // Escape it
+            result += "\"" + escapeForCpp(quoted) + "\"";
+            
+            start = end_quote + 1;
+            quote_pos = action.find('"', start);
         }
         
-        if (inHeaderCode) {
-            definition.headerCode += line + "\n";
-        } else if (line.substr(0, 7) == "%option") {
-            definition.options.push_back(line.substr(7));
+        // Add the remaining part
+        if (start < action.length()) {
+            result += action.substr(start);
         }
+        
+        return result;
     }
-}
-
-void LexerGenerator::parseRulesSection(const std::string& content) {
-    std::istringstream stream(content);
-    std::string line;
-    std::string currentPattern;
-    std::string currentAction;
-    bool inAction = false;
-    int braceCount = 0;
-    int priority = 1000; // Higher number = lower priority
     
-    while (std::getline(stream, line)) {
-        // Trim whitespace
-        line.erase(0, line.find_first_not_of(" \t"));
-        line.erase(line.find_last_not_of(" \t") + 1);
+std::string FixedLexerGenerator::formatTokenAction(const std::string& action) {
+        std::string result = action;
+        // Trim leading whitespace
+        result.erase(0, result.find_first_not_of(" \t\n\r"));
+        // Trim trailing whitespace
+        result.erase(result.find_last_not_of(" \t\n\r") + 1);
         
-        if (line.empty()) continue;
-        
-        if (!inAction) {
-            // Look for pattern and action
-            size_t actionStart = line.find_first_of(" \t{");
-            if (actionStart != std::string::npos) {
-                currentPattern = line.substr(0, actionStart);
+        // Handle printf statements with token names
+        size_t printf_pos = result.find("printf");
+        if (printf_pos != std::string::npos) {
+            size_t open_quote = result.find("\"", printf_pos);
+            size_t close_quote = result.find("\"", open_quote + 1);
+            if (open_quote != std::string::npos && close_quote != std::string::npos) {
+                // Keep the printf format string as is, just ensure \n is properly escaped
+                std::string before = result.substr(0, open_quote + 1);
+                std::string format = result.substr(open_quote + 1, close_quote - open_quote - 1);
+                std::string after = result.substr(close_quote);
                 
-                // Find the action part
-                size_t bracePos = line.find('{', actionStart);
-                if (bracePos != std::string::npos) {
-                    inAction = true;
-                    braceCount = 1;
-                    currentAction = line.substr(bracePos + 1);
-                    
-                    // Count braces in the current line
-                    for (size_t i = bracePos + 1; i < line.length(); i++) {
-                        if (line[i] == '{') braceCount++;
-                        else if (line[i] == '}') braceCount--;
-                    }
-                    
-                    if (braceCount == 0) {
-                        // Action complete on same line
-                        currentAction = currentAction.substr(0, currentAction.find_last_of('}'));
-                        
-                        LexerRule rule;
-                        rule.pattern = currentPattern;
-                        rule.action = currentAction;
-                        rule.isRegex = !isStringLiteral(currentPattern);
-                        rule.priority = priority++;
-                        definition.rules.push_back(rule);
-                        
-                        currentPattern.clear();
-                        currentAction.clear();
-                        inAction = false;
-                    }
+                // Replace literal \n with \\n in the format string
+                size_t pos = 0;
+                while ((pos = format.find("\\n", pos)) != std::string::npos) {
+                    format.replace(pos, 2, "\\\\n");
+                    pos += 2;
                 }
-            }
-        } else {
-            // Continue collecting action
-            currentAction += "\n" + line;
-            
-            // Count braces
-            for (char c : line) {
-                if (c == '{') braceCount++;
-                else if (c == '}') braceCount--;
-            }
-            
-            if (braceCount == 0) {
-                // Action complete
-                currentAction = currentAction.substr(0, currentAction.find_last_of('}'));
                 
-                LexerRule rule;
-                rule.pattern = currentPattern;
-                rule.action = currentAction;
-                rule.isRegex = !isStringLiteral(currentPattern);
-                rule.priority = priority++;
-                definition.rules.push_back(rule);
-                
-                currentPattern.clear();
-                currentAction.clear();
-                inAction = false;
+                result = before + format + after;
             }
         }
+        
+        // Ensure semicolon at the end
+        if (!result.empty() && result.back() != ';') {
+            result += ";";
+        }
+        
+        return result;
     }
-}
 
-void LexerGenerator::parseUserCodeSection(const std::string& content) {
-    definition.userCode = content;
-}
-
-void LexerGenerator::extractTokensFromParser(const std::string& parserFile) {
-    std::ifstream file(parserFile);
-    if (!file.is_open()) {
-        std::cerr << "Warning: Cannot open parser file " << parserFile << std::endl;
-        return;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Look for %token declarations
-        if (line.find("%token") != std::string::npos) {
-            std::istringstream tokenStream(line);
-            std::string word;
-            bool foundToken = false;
+bool FixedLexerGenerator::parseDefinitionFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Error: No se pudo abrir el archivo " << filename << std::endl;
+            return false;
+        }
+        
+        std::string line;
+        std::string section = "";
+        
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            if (line.empty() || line[0] == '#') continue;
             
-            while (tokenStream >> word) {
-                if (foundToken) {
-                    // Remove angle brackets if present (e.g., %token<number>)
-                    if (word.find('<') != std::string::npos) {
-                        continue; // Skip type declarations
-                    }
-                    tokenMap[word] = word;
-                } else if (word == "%token" || word.find("%token<") == 0) {
-                    foundToken = true;
-                }
+            // Check for section headers
+            if (line == "%{") {
+                section = "includes";
+                continue;
+            } else if (line == "%}") {
+                section = "";
+                continue;
+            } else if (line == "%%") {
+                section = "rules";
+                continue;
+            }
+            
+            // Parse based on current section
+            if (section == "includes") {
+                includes.push_back(line);
+            } else if (section == "rules") {
+                parseRule(line);
             }
         }
-    }
-    file.close();
-}
-
-std::string LexerGenerator::generateTokenEnum() {
-    std::string result = "enum TokenType {\n";
-    result += "    TOKEN_EOF = 0,\n";
-    result += "    TOKEN_ERROR = -1,\n";
-    
-    for (const auto& token : tokenMap) {
-        result += "    " + token.first + ",\n";
-    }
-    
-    result += "};\n\n";
-    return result;
-}
-
-std::string LexerGenerator::generateLexerClass() {
-    std::string result = R"(
-class Lexer {
-private:
-    std::string input;
-    size_t position;
-    size_t line;
-    size_t column;
-    
-    struct Token {
-        TokenType type;
-        std::string value;
-        size_t line;
-        size_t column;
-    };
-    
-    Token currentToken;
-    
-    bool matchPattern(const std::string& pattern, std::string& matched);
-    bool matchRegex(const std::string& regex, std::string& matched);
-    bool matchString(const std::string& str, std::string& matched);
-    void skipWhitespace();
-    char peek(size_t offset = 0);
-    void advance(size_t count = 1);
-    
-public:
-    union YYSTYPE {
-        int number;
-        double decimal;
-        char* string;
-    } yylval;
-    
-    char* yytext;
-    int line_count;
-    
-    Lexer(const std::string& input);
-    ~Lexer();
-    
-    int yylex();
-    TokenType getNextToken();
-    const Token& getCurrentToken() const { return currentToken; }
-    
-    // Flex compatibility
-    void setInput(const std::string& input);
-    std::string getText() const;
-    size_t getLine() const { return line; }
-    size_t getColumn() const { return column; }
-};
-
-extern Lexer* globalLexer;
-
-// Global functions for Flex compatibility
-int yylex();
-)";
-    
-    return result;
-}
-
-std::string LexerGenerator::generateLexerImplementation() {
-    std::string result = R"(
-#include "lexer.hpp"
-#include <regex>
-#include <cstring>
-#include <cstdlib>
-
-Lexer* globalLexer = nullptr;
-
-Lexer::Lexer(const std::string& input) : input(input), position(0), line(1), column(1) {
-    line_count = 1;
-    yytext = nullptr;
-    yylval.string = nullptr;
-    globalLexer = this;
-}
-
-Lexer::~Lexer() {
-    if (yytext) {
-        free(yytext);
-    }
-    if (yylval.string) {
-        free(yylval.string);
-    }
-}
-
-void Lexer::setInput(const std::string& newInput) {
-    input = newInput;
-    position = 0;
-    line = 1;
-    column = 1;
-    line_count = 1;
-}
-
-char Lexer::peek(size_t offset) {
-    if (position + offset >= input.length()) {
-        return '\0';
-    }
-    return input[position + offset];
-}
-
-void Lexer::advance(size_t count) {
-    for (size_t i = 0; i < count && position < input.length(); i++) {
-        if (input[position] == '\n') {
-            line++;
-            line_count++;
-            column = 1;
-        } else {
-            column++;
-        }
-        position++;
-    }
-}
-
-bool Lexer::matchString(const std::string& str, std::string& matched) {
-    if (position + str.length() > input.length()) {
-        return false;
-    }
-    
-    if (input.substr(position, str.length()) == str) {
-        matched = str;
+        
         return true;
     }
-    return false;
-}
-
-bool Lexer::matchRegex(const std::string& regexStr, std::string& matched) {
-    try {
-        std::regex pattern(regexStr);
-        std::smatch match;
-        std::string remaining = input.substr(position);
-        
-        if (std::regex_search(remaining, match, pattern) && match.position() == 0) {
-            matched = match.str();
-            return true;
-        }
-    } catch (const std::regex_error& e) {
-        // Fallback to string matching if regex fails
-        return false;
-    }
-    return false;
-}
-
-bool Lexer::matchPattern(const std::string& pattern, std::string& matched) {
-    if (pattern.front() == '"' && pattern.back() == '"') {
-        // String literal
-        std::string str = pattern.substr(1, pattern.length() - 2);
-        return matchString(str, matched);
-    } else {
-        // Regex pattern
-        std::string regexPattern = convertFlexPatternToRegex(pattern);
-        return matchRegex(regexPattern, matched);
-    }
-}
-
-TokenType Lexer::getNextToken() {
-    // Skip whitespace and comments first
-    while (position < input.length()) {
-        char c = peek();
-        if (c == ' ' || c == '\t') {
-            advance();
-            continue;
-        }
-        break;
-    }
     
-    if (position >= input.length()) {
-        currentToken.type = TOKEN_EOF;
-        currentToken.value = "";
-        return TOKEN_EOF;
-    }
-    
-    std::string matched;
-    
-)";
-
-    // Generate rule matching code
-    for (const auto& rule : definition.rules) {
-        result += "    // Rule: " + rule.pattern + "\n";
-        result += "    if (matchPattern(\"" + escapeString(rule.pattern) + "\", matched)) {\n";
+void FixedLexerGenerator::parseRule(const std::string& line) {
+        // Skip comments and empty lines
+        if (line.empty() || line[0] == '#') return;
         
-        // Update yytext
-        result += "        if (yytext) free(yytext);\n";
-        result += "        yytext = strdup(matched.c_str());\n";
-        result += "        advance(matched.length());\n";
-        
-        // Process the action
-        std::string action = rule.action;
-        
-        // Replace common patterns in actions
-        if (action.find("return") != std::string::npos) {
-            // Extract the token name
-            size_t returnPos = action.find("return");
-            size_t tokenStart = action.find_first_not_of(" \t", returnPos + 6);
-            size_t tokenEnd = action.find_first_of(" \t;}", tokenStart);
-            if (tokenEnd == std::string::npos) tokenEnd = action.length();
-            
-            std::string tokenName = action.substr(tokenStart, tokenEnd - tokenStart);
-            
-            // Handle special cases
-            if (action.find("yylval.number") != std::string::npos) {
-                result += "        yylval.number = atoi(matched.c_str());\n";
-            } else if (action.find("yylval.string") != std::string::npos) {
-                if (action.find("strdup") != std::string::npos) {
-                    result += "        yylval.string = strdup(matched.c_str());\n";
-                } else {
-                    result += "        yylval.string = strdup(matched.c_str());\n";
-                }
+        // Find the opening '{' that starts the action block, but make sure it is NOT inside quotes.
+        size_t brace_start = std::string::npos;
+        bool in_quotes = false;
+        for (size_t i = 0; i < line.length(); ++i) {
+            char ch = line[i];
+            if (ch == '"') {
+                // Toggle quote status (simple quote handling – assumes well-formed input)
+                in_quotes = !in_quotes;
+            } else if (ch == '{' && !in_quotes) {
+                brace_start = i;
+                break;
             }
-            
-            result += "        currentToken.type = " + tokenName + ";\n";
-            result += "        currentToken.value = matched;\n";
-            result += "        return " + tokenName + ";\n";
-        } else if (action.find("/*") != std::string::npos || action.find("ignore") != std::string::npos) {
-            // Comment or ignore action - continue to next token
-            result += "        continue;\n";
-        } else {
-            // Custom action - try to execute it
-            result += "        " + action + "\n";
-            result += "        continue;\n";
         }
         
-        result += "    }\n\n";
+        // Now find the corresponding closing '}' (again, NOT inside quotes) starting from the end.
+        size_t brace_end = std::string::npos;
+        in_quotes = false;
+        for (size_t i = line.length(); i-- > 0;) {
+            char ch = line[i];
+            if (ch == '"') {
+                in_quotes = !in_quotes;
+            } else if (ch == '}' && !in_quotes) {
+                brace_end = i;
+                break;
+            }
+        }
+        
+        if (brace_start == std::string::npos || brace_end == std::string::npos || brace_end <= brace_start) {
+            return; // Invalid rule format
+        }
+        
+        std::string pattern = line.substr(0, brace_start);
+        std::string action = line.substr(brace_start + 1, brace_end - brace_start - 1);
+        
+        // Trim whitespace
+        pattern.erase(0, pattern.find_first_not_of(" \t"));
+        pattern.erase(pattern.find_last_not_of(" \t") + 1);
+        action.erase(0, action.find_first_not_of(" \t"));
+        action.erase(action.find_last_not_of(" \t") + 1);
+        
+        // Skip pattern definitions like {NUMBER}, {ID}, etc.
+        if (pattern.length() > 2 && pattern.front() == '{' && pattern.back() == '}') {
+            return;
+        }
+        
+        // Remove quotes from pattern if present
+        if (pattern.length() >= 2 && pattern.front() == '"' && pattern.back() == '"') {
+            pattern = pattern.substr(1, pattern.length() - 2);
+        }
+        
+        // Skip ignore rules
+        if (action.find("ignore") != std::string::npos || 
+            action.find("/*") != std::string::npos ||
+            action.empty()) {
+            return;
+        }
+        
+        TokenRule rule;
+        rule.pattern = pattern;
+        rule.action = action;
+        rule.ignore = false;
+        
+        // Extract token name from return statement
+        size_t return_pos = action.find("return ");
+        if (return_pos != std::string::npos) {
+            std::string return_part = action.substr(return_pos + 7);
+            size_t semicolon = return_part.find(';');
+            if (semicolon != std::string::npos) {
+                return_part = return_part.substr(0, semicolon);
+            }
+            return_part.erase(0, return_part.find_first_not_of(" \t"));
+            return_part.erase(return_part.find_last_not_of(" \t") + 1);
+            rule.token_name = return_part;
+        }
+        
+        rules.push_back(rule);
     }
     
-    result += R"(
-    // No rule matched - return error or unexpected character
-    currentToken.type = TOKEN_ERROR;
-    currentToken.value = std::string(1, peek());
-    advance();
-    return TOKEN_ERROR;
-}
-
-int Lexer::yylex() {
-    return static_cast<int>(getNextToken());
-}
-
-std::string Lexer::getText() const {
-    return yytext ? std::string(yytext) : "";
-}
-
-// Global function for Flex compatibility
-int yylex() {
-    if (globalLexer) {
-        return globalLexer->yylex();
+void FixedLexerGenerator::generateLexer(const std::string& output_filename) {
+        std::ofstream out(output_filename);
+        
+        // Generate header
+        out << "// Generated Bison-Compatible Lexer\n";
+        out << "// Auto-generated - do not edit manually\n\n";
+        
+        // Include user headers
+        for (const auto& include : includes) {
+            out << include << "\n";
+        }
+        
+        out << "#include <iostream>\n";
+        out << "#include <fstream>\n";
+        out << "#include <string>\n";
+        out << "#include <vector>\n";
+        out << "#include <cctype>\n";
+        out << "#include <cstdlib>\n";
+        out << "#include <cstring>\n";
+        out << "#include <unordered_map>\n\n";
+        
+        // Forward declarations and external variables
+        out << "// Forward declarations and external variables\n";
+        out << "extern \"C\" {\n";
+        out << "    extern union YYSTYPE {\n";
+        out << "        int number;\n";
+        out << "        double decimal;\n";
+        out << "        char* string;\n";
+        out << "    } yylval;\n";
+        out << "}\n\n";
+        
+        // Token definitions
+        out << "// Token definitions\n";
+        out << "#define NUMBER 258\n";
+        out << "#define STRING 259\n";
+        out << "#define IDENTIFIER 260\n";
+        out << "#define PRINT 261\n";
+        out << "#define LET 263\n";
+        out << "#define IN 264\n";
+        out << "#define FUNCTION 265\n";
+        out << "#define ARROW 266\n";
+        out << "#define TYPE 267\n";
+        out << "#define INHERITS 268\n";
+        out << "#define BASE 269\n";
+        out << "#define NEW 270\n";
+        out << "#define IF 271\n";
+        out << "#define ELIF 272\n";
+        out << "#define ELSE 273\n";
+        out << "#define IS 274\n";
+        out << "#define AS 275\n";
+        out << "#define LPAREN 276\n";
+        out << "#define RPAREN 277\n";
+        out << "#define LBRACE 278\n";
+        out << "#define RBRACE 279\n";
+        out << "#define TYPE_NUMBER 280\n";
+        out << "#define TYPE_STRING 281\n";
+        out << "#define TYPE_BOOLEAN 282\n";
+        out << "#define TRUE 283\n";
+        out << "#define FALSE 284\n";
+        out << "#define WHILE 285\n";
+        out << "#define FOR 286\n";
+        out << "#define PLUS 287\n";
+        out << "#define MINUS 288\n";
+        out << "#define MULTIPLY 289\n";
+        out << "#define DIVIDE 290\n";
+        out << "#define MODULO 291\n";
+        out << "#define COLON 292\n";
+        out << "#define POWER 293\n";
+        out << "#define CONCAT 294\n";
+        out << "#define CONCAT_SPACE 295\n";
+        out << "#define SEMICOLON 296\n";
+        out << "#define COMMA 297\n";
+        out << "#define EQUALS 298\n";
+        out << "#define EQEQ 299\n";
+        out << "#define AND 300\n";
+        out << "#define GREATEREQ 301\n";
+        out << "#define NOTEQ 302\n";
+        out << "#define LESS 303\n";
+        out << "#define GREATER 304\n";
+        out << "#define OR 305\n";
+        out << "#define NOT 306\n";
+        out << "#define LESSEQ 307\n";
+        out << "#define ASSIGN 308\n";
+        out << "#define DOT 309\n\n";
+        
+        // Global variables
+        out << "// Global variables expected by Bison\n";
+        out << "char* yytext = nullptr;\n";
+        out << "int yylineno = 1;\n";
+        out << "int yycolumn = 1;\n";
+        out << "std::string input_text;\n";
+        out << "size_t input_pos = 0;\n\n";
+        
+        // Keywords map
+        out << "// Keywords map\n";
+        out << "std::unordered_map<std::string, int> keywords = {\n";
+        for (const auto& rule : rules) {
+            if (rule.pattern == "let" || rule.pattern == "print" || rule.pattern == "function" ||
+                rule.pattern == "if" || rule.pattern == "else" || rule.pattern == "elif" ||
+                rule.pattern == "while" || rule.pattern == "for" || rule.pattern == "in" ||
+                rule.pattern == "type" || rule.pattern == "inherits" || rule.pattern == "new" ||
+                rule.pattern == "self" || rule.pattern == "base" || rule.pattern == "is" ||
+                rule.pattern == "as") {
+                out << "    {\"" << rule.pattern << "\", " << rule.token_name << "},\n";
+            }
+        }
+        out << "};\n\n";
+        
+        // Helper functions
+        out << "// Helper functions\n";
+        out << "char current_char() {\n";
+        out << "    if (input_pos >= input_text.length()) return '\\0';\n";
+        out << "    return input_text[input_pos];\n";
+        out << "}\n\n";
+        
+        out << "char peek_char(int offset = 1) {\n";
+        out << "    size_t pos = input_pos + offset;\n";
+        out << "    if (pos >= input_text.length()) return '\\0';\n";
+        out << "    return input_text[pos];\n";
+        out << "}\n\n";
+        
+        out << "void advance() {\n";
+        out << "    if (input_pos < input_text.length()) {\n";
+        out << "        if (current_char() == '\\n') {\n";
+        out << "            yylineno++;\n";
+        out << "            yycolumn = 1;\n";
+        out << "        } else {\n";
+        out << "            yycolumn++;\n";
+        out << "        }\n";
+        out << "        input_pos++;\n";
+        out << "    }\n";
+        out << "}\n\n";
+        
+        out << "void skip_whitespace() {\n";
+        out << "    while (current_char() != '\\0' && std::isspace(current_char())) {\n";
+        out << "        advance();\n";
+        out << "    }\n";
+        out << "}\n\n";
+        
+        out << "std::string read_number() {\n";
+        out << "    std::string result;\n";
+        out << "    while (current_char() != '\\0' && std::isdigit(current_char())) {\n";
+        out << "        result += current_char();\n";
+        out << "        advance();\n";
+        out << "    }\n";
+        out << "    if (current_char() == '.' && std::isdigit(peek_char())) {\n";
+        out << "        result += current_char();\n";
+        out << "        advance();\n";
+        out << "        while (current_char() != '\\0' && std::isdigit(current_char())) {\n";
+        out << "            result += current_char();\n";
+        out << "            advance();\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    return result;\n";
+        out << "}\n\n";
+        
+        out << "std::string read_identifier() {\n";
+        out << "    std::string result;\n";
+        out << "    while (current_char() != '\\0' && (std::isalnum(current_char()) || current_char() == '_')) {\n";
+        out << "        result += current_char();\n";
+        out << "        advance();\n";
+        out << "    }\n";
+        out << "    return result;\n";
+        out << "}\n\n";
+        
+        out << "std::string read_string() {\n";
+        out << "    std::string result;\n";
+        out << "    advance(); // Skip opening quote\n";
+        out << "    while (current_char() != '\\0' && current_char() != '\"') {\n";
+        out << "        if (current_char() == '\\\\' && peek_char() != '\\0') {\n";
+        out << "            advance(); // Skip backslash\n";
+        out << "            switch (current_char()) {\n";
+        out << "                case 'n': result += '\\n'; break;\n";
+        out << "                case 't': result += '\\t'; break;\n";
+        out << "                case 'r': result += '\\r'; break;\n";
+        out << "                case '\\\\': result += '\\\\'; break;\n";
+        out << "                case '\"': result += '\"'; break;\n";
+        out << "                default: result += current_char(); break;\n";
+        out << "            }\n";
+        out << "        } else {\n";
+        out << "            result += current_char();\n";
+        out << "        }\n";
+        out << "        advance();\n";
+        out << "    }\n";
+        out << "    if (current_char() == '\"') advance(); // Skip closing quote\n";
+        out << "    return result;\n";
+        out << "}\n\n";
+        
+        // Main lexer function
+        out << "// Main lexer function\n";
+        out << "int yylex() {\n";
+        out << "    skip_whitespace();\n";
+        out << "    \n";
+        out << "    if (current_char() == '\\0') {\n";
+        out << "        return 0; // EOF\n";
+        out << "    }\n";
+        out << "    \n";
+        out << "    // Free previous yytext\n";
+        out << "    if (yytext) {\n";
+        out << "        free(yytext);\n";
+        out << "        yytext = nullptr;\n";
+        out << "    }\n";
+        out << "    \n";
+        out << "    // Numbers\n";
+        out << "    if (std::isdigit(current_char())) {\n";
+        out << "        std::string num = read_number();\n";
+        out << "        yytext = strdup(num.c_str());\n";
+        out << "        yylval.number = std::atoi(num.c_str());\n";
+        out << "        printf(\"<NUMBER:%s>\\n\", num.c_str());\n";
+        out << "        return NUMBER;\n";
+        out << "    }\n";
+        out << "    \n";
+        out << "    // Identifiers and keywords\n";
+        out << "    if (std::isalpha(current_char()) || current_char() == '_') {\n";
+        out << "        std::string id = read_identifier();\n";
+        out << "        yytext = strdup(id.c_str());\n";
+        out << "        \n";
+        out << "        // Check if it's a keyword\n";
+        out << "        auto it = keywords.find(id);\n";
+        out << "        if (it != keywords.end()) {\n";
+        out << "            printf(\"<%s>\\n\", id.c_str());\n";
+        out << "            return it->second;\n";
+        out << "        } else {\n";
+        out << "            yylval.string = strdup(id.c_str());\n";
+        out << "            printf(\"<ID:%s>\\n\", id.c_str());\n";
+        out << "            return IDENTIFIER;\n";
+        out << "        }\n";
+        out << "    }\n";
+        out << "    \n";
+        out << "    // Strings\n";
+        out << "    if (current_char() == '\"') {\n";
+        out << "        std::string str = read_string();\n";
+        out << "        yytext = strdup(str.c_str());\n";
+        out << "        yylval.string = strdup(str.c_str());\n";
+        out << "        printf(\"<STRING:%s>\\n\", str.c_str());\n";
+        out << "        return STRING;\n";
+        out << "    }\n";
+        out << "    \n";
+        
+        // Multi-character operators
+        out << "    // Multi-character operators\n";
+        for (const auto& rule : rules) {
+            if (rule.pattern.length() == 2 && 
+                rule.pattern != "if" && rule.pattern != "in" && 
+                rule.pattern != "is" && rule.pattern != "as") {
+                out << "    if (current_char() == '" << rule.pattern[0] << "' && peek_char() == '" << rule.pattern[1] << "') {\n";
+                out << "        yytext = strdup(\"" << escapeForCpp(rule.pattern) << "\");\n";
+                out << "        advance(); advance();\n";
+                out << "        " << escapeAction(rule.action) << "\n";
+                out << "    }\n";
+            }
+        }
+        
+        // Single character tokens
+        out << "    \n";
+        out << "    // Single character tokens\n";
+        out << "    char c = current_char();\n";
+        out << "    yytext = (char*)malloc(2);\n";
+        out << "    yytext[0] = c;\n";
+        out << "    yytext[1] = '\\0';\n";
+        out << "    advance();\n";
+        out << "    \n";
+        out << "    switch (c) {\n";
+        
+        for (const auto& rule : rules) {
+            if (rule.pattern.length() == 1) {
+                out << "        case '" << rule.pattern[0] << "':\n";
+                std::string formatted_action = formatTokenAction(rule.action);
+                out << "            " << formatted_action << "\n";
+                out << "            break;\n";
+            }
+        }
+        
+        out << "        default:\n";
+        out << "            printf(\"Error: Carácter no reconocido '%c' en línea %d, columna %d\\n\", c, yylineno, yycolumn);\n";
+        out << "            return c;\n";
+        out << "    }\n";
+        out << "}\n\n";
+        
+        // Utility functions
+        out << "void set_input_from_file(FILE* file) {\n";
+        out << "    if (!file) return;\n";
+        out << "    fseek(file, 0, SEEK_END);\n";
+        out << "    long length = ftell(file);\n";
+        out << "    fseek(file, 0, SEEK_SET);\n";
+        out << "    input_text.resize(length);\n";
+        out << "    fread(&input_text[0], 1, length, file);\n";
+        out << "    input_pos = 0;\n";
+        out << "    yylineno = 1;\n";
+        out << "    yycolumn = 1;\n";
+        out << "}\n\n";
+        
+        out << "void set_input(const std::string& text) {\n";
+        out << "    input_text = text;\n";
+        out << "    input_pos = 0;\n";
+        out << "    yylineno = 1;\n";
+        out << "    yycolumn = 1;\n";
+        out << "}\n";
+        
+        out.close();
+        std::cout << "Fixed Bison-compatible lexer generado exitosamente en: " << output_filename << std::endl;
     }
+
+// Main function for the lexer generator
+int main(int argc, char* argv[]) {
+    if (argc != 3) {
+        std::cerr << "Uso: " << argv[0] << " <archivo_definicion.txt> <archivo_salida.cpp>" << std::endl;
+        return 1;
+    }
+    
+    FixedLexerGenerator generator;
+    
+    if (!generator.parseDefinitionFile(argv[1])) {
+        return 1;
+    }
+    
+    generator.generateLexer(argv[2]);
+    
     return 0;
-}
-)";
-    
-    return result;
-}
-
-std::string LexerGenerator::escapeString(const std::string& str) {
-    std::string result;
-    for (char c : str) {
-        if (c == '"' || c == '\\') {
-            result += '\\';
-        }
-        result += c;
-    }
-    return result;
-}
-
-std::string LexerGenerator::convertFlexPatternToRegex(const std::string& pattern) {
-    std::string result = pattern;
-    
-    // Convert common Flex patterns to C++ regex
-    // This is a simplified conversion - a full implementation would be more complex
-    
-    // Replace [0-9]+ with \d+
-    size_t pos = 0;
-    while ((pos = result.find("[0-9]+", pos)) != std::string::npos) {
-        result.replace(pos, 6, "\\d+");
-        pos += 3;
-    }
-    
-    // Replace [a-zA-Z] patterns
-    pos = 0;
-    while ((pos = result.find("[a-zA-Z]", pos)) != std::string::npos) {
-        result.replace(pos, 9, "[a-zA-Z]");
-        pos += 9;
-    }
-    
-    // Handle string literals in quotes
-    if (result.front() == '"' && result.back() == '"') {
-        result = result.substr(1, result.length() - 2);
-        // Escape special regex characters
-        std::string escaped;
-        for (char c : result) {
-            if (c == '.' || c == '*' || c == '+' || c == '?' || c == '^' || c == '$' || 
-                c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || 
-                c == '|' || c == '\\') {
-                escaped += '\\';
-            }
-            escaped += c;
-        }
-        result = escaped;
-    }
-    
-    return result;
-}
-
-bool LexerGenerator::isStringLiteral(const std::string& pattern) {
-    return pattern.front() == '"' && pattern.back() == '"';
-}
-
-bool LexerGenerator::generateLexer(const std::string& headerFile, const std::string& sourceFile) {
-    // Generate header file
-    std::ofstream header(headerFile);
-    if (!header.is_open()) {
-        std::cerr << "Error: Cannot create header file " << headerFile << std::endl;
-        return false;
-    }
-    
-    header << "#ifndef LEXER_HPP\n";
-    header << "#define LEXER_HPP\n\n";
-    header << "#include <string>\n";
-    header << "#include <iostream>\n\n";
-    
-    // Include original header code
-    header << definition.headerCode << "\n";
-    
-    // Generate token enum
-    header << generateTokenEnum();
-    
-    // Generate lexer class
-    header << generateLexerClass();
-    
-    header << "\n#endif // LEXER_HPP\n";
-    header.close();
-    
-    // Generate source file
-    std::ofstream source(sourceFile);
-    if (!source.is_open()) {
-        std::cerr << "Error: Cannot create source file " << sourceFile << std::endl;
-        return false;
-    }
-    
-    source << generateLexerImplementation();
-    source.close();
-    
-    return true;
 }

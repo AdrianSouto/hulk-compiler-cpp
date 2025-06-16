@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Iinclude -fexceptions
 LLVM_CONFIG = llvm-config
-LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions')
+LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions//')
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
 SRC_DIR = src
@@ -96,9 +96,7 @@ TARGET = hulk/hulk_compiler.exe
 
 INPUT_FILE = script.hulk
 
-.PHONY: all compile execute clean force-regenerate
-
-all: compile
+.PHONY: compile execute clean force-regenerate
 
 compile: $(TARGET)
 	@echo "Compilation completed with generated lexer. Artifacts stored in hulk/"
@@ -112,13 +110,21 @@ $(TARGET): $(HULK_DIR) $(LEXER_SOURCE) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT
 $(HULK_DIR):
 	@mkdir -p hulk
 
-$(LEXER_GENERATOR): $(LEXER_DIR)/SimpleLexerGenerator.cpp
+$(LEXER_GENERATOR): $(LEXER_DIR)/LexerGenerator.cpp $(LEXER_DIR)/LexerGenerator.hpp
 	@echo "Building lexer generator..."
-	@cd $(LEXER_DIR) && $(MAKE)
+	@$(CXX) -std=c++17 -Wall -Wextra -o $(LEXER_GENERATOR) $(LEXER_DIR)/LexerGenerator.cpp
 
-$(LEXER_SOURCE) $(LEXER_HEADER): $(LEXER_GENERATOR) lexer.l parser.y | $(HULK_DIR)
-	@echo "Generating lexer from lexer.l..."
-	@cd $(LEXER_DIR) && ./lexer_generator.exe
+$(LEXER_SOURCE) $(LEXER_HEADER): $(LEXER_GENERATOR) lexer_definition.txt | $(HULK_DIR)
+	@echo "Generating lexer from lexer_definition.txt..."
+	@./$(LEXER_GENERATOR) lexer_definition.txt $(LEXER_SOURCE)
+	@echo "// Generated Lexer Header" > $(LEXER_HEADER)
+	@echo "#ifndef LEXER_HPP" >> $(LEXER_HEADER)
+	@echo "#define LEXER_HPP" >> $(LEXER_HEADER)
+	@echo "extern int yylex();" >> $(LEXER_HEADER)
+	@echo "extern char* yytext;" >> $(LEXER_HEADER)
+	@echo "extern int yylineno;" >> $(LEXER_HEADER)
+	@echo "extern void set_input(const std::string& text);" >> $(LEXER_HEADER)
+	@echo "#endif // LEXER_HPP" >> $(LEXER_HEADER)
 
 $(PARSER_SOURCE) $(PARSER_HEADER): parser.y | $(HULK_DIR)
 	bison -d -o $(PARSER_SOURCE) parser.y
@@ -171,15 +177,6 @@ clean:
 	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
 	@rm -f $(LEXER_SOURCE) $(LEXER_HEADER)
 	@rm -f output.ll output.s output_exec output_exec.exe
-	@cd $(LEXER_DIR) && $(MAKE) clean
+	@rm -f $(LEXER_GENERATOR)
 	@echo "Clean completed."
-
-help:
-	@echo "Available targets:"
-	@echo "  compile  - Compile the Hulk compiler with generated lexer and generate hulk/ directory"
-	@echo "  execute  - Execute the compiled Hulk program (depends on compile)"
-	@echo "  clean    - Remove all build artifacts"
-	@echo "  help     - Show this help message"
-	@echo ""
-	@echo "This Makefile uses a generated lexer from lexer.l similar to Flex."
 
