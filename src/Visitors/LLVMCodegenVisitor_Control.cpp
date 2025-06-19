@@ -275,8 +275,22 @@ void LLVMCodegenVisitor::visit(ForRangeNode& node) {
     if (node.body) {
         node.body->accept(*this);
 
-        if (lastValue && lastValue->getType() == intType) {
-            builder.CreateStore(lastValue, resultVar);
+        // Store the last value from the body as the result
+        if (lastValue) {
+            llvm::Value* valueToStore = lastValue;
+            // Convert to int if necessary
+            if (lastValue->getType() != intType) {
+                if (lastValue->getType()->isDoubleTy()) {
+                    valueToStore = builder.CreateFPToSI(lastValue, intType, "body_result_to_int");
+                } else if (lastValue->getType()->isIntegerTy()) {
+                    if (lastValue->getType()->getIntegerBitWidth() < intType->getIntegerBitWidth()) {
+                        valueToStore = builder.CreateZExt(lastValue, intType, "body_result_extend");
+                    } else if (lastValue->getType()->getIntegerBitWidth() > intType->getIntegerBitWidth()) {
+                        valueToStore = builder.CreateTrunc(lastValue, intType, "body_result_trunc");
+                    }
+                }
+            }
+            builder.CreateStore(valueToStore, resultVar);
         }
     }
 

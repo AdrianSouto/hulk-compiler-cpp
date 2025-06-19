@@ -142,6 +142,25 @@ void LLVMCodegenVisitor::visit(ModuloNode& node) {
     node.right->accept(*this);
     llvm::Value* r = lastValue;
 
+    // Ensure both operands are of the same integer type
+    if (l->getType() != r->getType()) {
+        // Convert both to i32 if they're different types
+        llvm::Type* i32Type = llvm::Type::getInt32Ty(ctx);
+        if (l->getType() != i32Type) {
+            if (l->getType()->isIntegerTy()) {
+                l = builder.CreateIntCast(l, i32Type, true, "l_to_i32");
+            } else if (l->getType()->isDoubleTy()) {
+                l = builder.CreateFPToSI(l, i32Type, "l_double_to_i32");
+            }
+        }
+        if (r->getType() != i32Type) {
+            if (r->getType()->isIntegerTy()) {
+                r = builder.CreateIntCast(r, i32Type, true, "r_to_i32");
+            } else if (r->getType()->isDoubleTy()) {
+                r = builder.CreateFPToSI(r, i32Type, "r_double_to_i32");
+            }
+        }
+    }
 
     llvm::Function* function = builder.GetInsertBlock()->getParent();
     llvm::BasicBlock* originalBlock = builder.GetInsertBlock();

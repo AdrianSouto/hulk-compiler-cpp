@@ -78,20 +78,24 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
 
     llvm::FunctionType* funcType = llvm::FunctionType::get(returnType, paramTypes, false);
     
-
-    llvm::Function* function = llvm::Function::Create(
-        funcType, 
-        llvm::Function::ExternalLinkage, 
-        node.identifier, 
-        module
-    );
+    // Check if function already exists (from forward declaration)
+    llvm::Function* function = module.getFunction(node.identifier);
     
-
-    if (module.getFunction(node.identifier) && module.getFunction(node.identifier) != function) {
-        function->eraseFromParent();
-        std::cerr << "Error: Function '" << node.identifier << "' already defined" << std::endl;
-        lastValue = nullptr;
-        return;
+    if (function) {
+        // Function already exists, just verify the signature matches
+        if (function->getFunctionType() != funcType) {
+            std::cerr << "Error: Function '" << node.identifier << "' signature mismatch" << std::endl;
+            lastValue = nullptr;
+            return;
+        }
+    } else {
+        // Create new function
+        function = llvm::Function::Create(
+            funcType, 
+            llvm::Function::ExternalLinkage, 
+            node.identifier, 
+            module
+        );
     }
     
 

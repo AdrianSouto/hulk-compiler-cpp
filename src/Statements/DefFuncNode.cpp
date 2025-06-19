@@ -75,19 +75,40 @@ void DefFuncNode::print(int indent) const {
 }
 
 bool DefFuncNode::validate(IContext* context) {
-    IContext* innerContext = context->CreateChildContext();
-
+    // First, just register the function signature without validating the body
     std::unordered_set<std::string> paramSet;
     std::vector<std::string> paramNames;
     
     for (const auto& param : parameters) {
         if (paramSet.find(param.name) != paramSet.end()) {
             errorMessage = "Error in function '" + identifier + "': Duplicate parameter name '" + param.name + "'";
-            delete innerContext;
             return false;
         }
         paramSet.insert(param.name);
         paramNames.push_back(param.name);
+    }
+
+    if (!context->Define(identifier, paramNames)) {
+        errorMessage = "Error: Function '" + identifier + "' with " +
+                       std::to_string(parameters.size()) + " arguments is already defined";
+        return false;
+    }
+
+    Context* ctx = dynamic_cast<Context*>(context);
+    if (ctx) {
+        Type* retType = returnType ? returnType : Type::getNumberType();
+        ctx->DefineFunction(identifier, parameters, retType);
+    }
+
+    // The body validation will be done in a second pass
+    return true;
+}
+
+bool DefFuncNode::validateBody(IContext* context) {
+    IContext* innerContext = context->CreateChildContext();
+
+    // Add parameters to inner context
+    for (const auto& param : parameters) {
         innerContext->Define(param.name);
     }
 
@@ -96,27 +117,14 @@ bool DefFuncNode::validate(IContext* context) {
         return false;
     }
 
-
-
-    if (!context->Define(identifier, paramNames)) {
-        errorMessage = "Error: Function '" + identifier + "' with " +
-                       std::to_string(parameters.size()) + " arguments is already defined";
-        delete innerContext;
-        return false;
+    // Add the function itself to allow recursion
+    std::vector<std::string> paramNames;
+    for (const auto& param : parameters) {
+        paramNames.push_back(param.name);
     }
-
-
-    Context* ctx = dynamic_cast<Context*>(context);
-    if (ctx) {
-        Type* retType = returnType ? returnType : Type::getNumberType();
-        ctx->DefineFunction(identifier, parameters, retType);
-    }
-
-
     innerContext->Define(identifier, paramNames);
 
     if (isBlockBody) {
-
         for (auto stmt : statements) {
             if (!stmt->validate(innerContext)) {
                 errorMessage = "Error in function '" + identifier + "' body: " + stmt->getErrorMessage();
@@ -125,7 +133,6 @@ bool DefFuncNode::validate(IContext* context) {
             }
         }
     } else {
-
         if (!expr->validate(innerContext)) {
             errorMessage = "Error in function '" + identifier + "' body: " + expr->getErrorMessage();
             delete innerContext;

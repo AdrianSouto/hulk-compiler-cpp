@@ -168,7 +168,21 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
                 llvm::Value* memberPtr = builder.CreateStructGEP(structType, typedSelfPtr, attrIndex, "member_ptr");
                 
 
-                builder.CreateStore(val, memberPtr);
+                // Convert value to the correct type if needed
+                llvm::Type* memberType = structType->getElementType(attrIndex);
+                llvm::Value* convertedVal = val;
+                
+                if (val->getType() != memberType) {
+                    if (val->getType()->isDoubleTy() && memberType->isIntegerTy(32)) {
+                        // Convert double to i32
+                        convertedVal = builder.CreateFPToSI(val, memberType, "double_to_int");
+                    } else if (val->getType()->isIntegerTy(32) && memberType->isDoubleTy()) {
+                        // Convert i32 to double
+                        convertedVal = builder.CreateSIToFP(val, memberType, "int_to_double");
+                    }
+                }
+                
+                builder.CreateStore(convertedVal, memberPtr);
                 
                 std::cerr << "DEBUG: Successfully assigned value to member '" << node.member << "' at index " << attrIndex << std::endl;
                 

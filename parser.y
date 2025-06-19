@@ -1,847 +1,877 @@
 %{
 #include "../include/AllHeaders.hpp"
-#include "../include/Expressions/ForRangeNode.hpp"
-#include "../include/AST/Parameter.hpp"
-#include "../include/AST/Attribute.hpp"
 #include <iostream>
 #include <string>
-#include <cmath>
 #include <vector>
 
+// Declaraciones externas
 int yylex();
 void yyerror(const char* s);
 int line_count = 1;
-Program program;
+Program program;  // Cambiado de Program* a Program para compatibilidad con main.cpp
 extern char* yytext;
 %}
 
+/* Definición de la unión para los valores semánticos */
+%union {
+    double number;
+    double decimal;  // Agregado para compatibilidad con el lexer
+    char* string;
+
+    // Nodos del AST
+    Program* program_node;
+    StatementNode* statement;
+    ExpressionNode* expression;
+
+    // Listas y vectores
+    std::vector<StatementNode*>* statement_list;
+    std::vector<ExpressionNode*>* expression_list;
+    std::vector<Parameter>* parameter_list;
+    std::vector<VarDeclPair>* var_decl_list;
+    std::vector<std::string>* string_list;
+
+    // Tipos auxiliares
+    Parameter* parameter;
+    VarDeclPair* var_decl;
+    std::vector<std::pair<ExpressionNode*, ExpressionNode*>>* elif_list;
+    
+    // Tipos para atributos
+    std::vector<Attribute>* attribute_list;
+    Attribute* attribute;
+    Type* type_node;
+    
+    // Tipos para miembros de tipos (atributos y métodos)
+    std::vector<ASTNode*>* member_list;
+    ASTNode* member;
+}
+
+/* Tokens */
 %token<number> NUMBER
 %token<string> STRING IDENTIFIER
 %token PRINT
-%token EOL
-%token LET IN FUNCTION ARROW TYPE INHERITS BASE NEW
-%token IF ELIF ELSE IS AS
-%token LPAREN RPAREN LBRACE RBRACE
-%token TYPE_NUMBER TYPE_STRING TYPE_BOOLEAN
-%token TRUE FALSE
+%token LET IN FUNCTION ARROW TYPE INHERITS NEW
+%token IF ELSE ELIF
 %token WHILE FOR
 %token PLUS MINUS MULTIPLY DIVIDE MODULO COLON POWER CONCAT CONCAT_SPACE SEMICOLON COMMA EQUALS EQEQ AND GREATEREQ NOTEQ LESS GREATER OR NOT LESSEQ ASSIGN DOT
+%token LPAREN RPAREN LBRACE RBRACE
+%token TRUE FALSE
+%token BASE IS AS
+%token TYPE_NUMBER TYPE_STRING TYPE_BOOLEAN
+/* Constantes matemáticas */
+%token PI E
+/* Funciones matemáticas builtin */
+%token SQRT SIN COS EXP LOG RAND
 
-%union {
-    int number;
-    double decimal;
-    char* string;
-    ExpressionNode* expression;
-    StatementNode* statement;
-    ASTNode* ast_node;
-    std::vector<ExpressionNode*>* explist;
-    std::vector<std::string>* idlist;
-    std::vector<VarDeclPair>* decllist;
-    std::vector<StatementNode*>* stmtlist;
-    std::vector<Attribute>* attrlist;
-    std::vector<ASTNode*>* typemembers;
-    Type* type;
-    Attribute* attribute;
-}
+/* Precedencias y asociatividad (de menor a mayor precedencia) */
 %right ASSIGN
 %left OR
 %left AND
-%left EQEQ NOTEQ
-%left LESS LESSEQ GREATER GREATEREQ IS AS
+%nonassoc EQEQ NOTEQ
+%nonassoc LESS LESSEQ GREATER GREATEREQ
+%nonassoc IS AS
 %left CONCAT CONCAT_SPACE
 %left PLUS MINUS
 %left MULTIPLY DIVIDE MODULO
 %right POWER
-%right NOT
+%right UMINUS NOT
 %left DOT
-%left LPAREN RPAREN
-%type<expression> expression
-%type<expression> primary_expression
-%type<expression> postfix_expression
-%type<statement> statement
-%type<explist> expression_list
-%type<idlist> identifier_list
-%type<decllist> declaration_list
-%type<decllist> declaration
-%type<decllist> parameter_list
-%type<decllist> parameter
-%type<stmtlist> statement_block
-%type<stmtlist> statement_list_block
-%type<explist> expression_block
-%type<typemembers> type_member_list
-%type<ast_node> type_member
-%type<type> type
-%type<ast_node> ast_construct
+%nonassoc LPAREN RPAREN
+
+/* Tipos de los no-terminales */
+%type<program_node> program
+%type<statement_list> declaration_list statement_list
+%type<statement> declaration type_definition function_definition statement
+%type<expression> expression primary_expression
+%type<expression_list> expression_list expression_list_opt expression_sequence
+%type<string_list> identifier_list
+%type<var_decl_list> var_decl_list
+%type<elif_list> elif_list
+%type<var_decl> var_decl
+%type<parameter_list> parameter_list
+%type<parameter> parameter
+%type<attribute_list> attribute_list
+%type<attribute> attribute
+%type<type_node> type_annotation
+%type<member_list> member_list
+%type<member> member
 
 %%
 
+/* Regla principal del programa */
 program:
-    statement_list
-    | expression SEMICOLON {
-
+    /* Solo una expresión global */
+    expression {
+        program.Statements.clear();
         program.Statements.push_back(new ExpressionStatementNode($1));
     }
-    | expression {
-
-        program.Statements.push_back(new ExpressionStatementNode($1));
+    /* Múltiples expresiones globales - todas deben terminar con punto y coma */
+    | expression_sequence {
+        program.Statements.clear();
+        for (auto expr : *$1) {
+            program.Statements.push_back(new ExpressionStatementNode(expr));
+        }
+        delete $1;
     }
-    | { }
-
+    /* Declaraciones seguidas de expresión global */
+    | declaration_list expression {
+        program.Statements.clear();
+        program.Statements = *$1;
+        program.Statements.push_back(new ExpressionStatementNode($2));
+        delete $1;
+    }
+    /* Declaraciones seguidas de múltiples expresiones */
+    | declaration_list expression_sequence {
+        program.Statements.clear();
+        program.Statements = *$1;
+        for (auto expr : *$2) {
+            program.Statements.push_back(new ExpressionStatementNode(expr));
+        }
+        delete $1;
+        delete $2;
+    }
+    /* Lista mixta de statements */
+    | statement_list {
+        program.Statements.clear();
+        program.Statements = *$1;
+        delete $1;
+    }
     ;
 
+/* Lista de statements (declaraciones y expresiones mezcladas) */
 statement_list:
-    statement_list statement EOL { program.Statements.push_back($2); }
-    | statement_list statement { program.Statements.push_back($2); }
-    | statement_list EOL {  }
-    | statement EOL { program.Statements.push_back($1); }
-    | statement { program.Statements.push_back($1); }
-    | EOL { }
-    ;
-
-statement:
-    PRINT expression SEMICOLON { $$ = new PrintStatementNode($2); }
-    | PRINT expression { $$ = new PrintStatementNode($2); }
-    | IDENTIFIER ASSIGN expression SEMICOLON { $$ = new ExpressionStatementNode(new AssignmentNode($1, $3)); free($1); }
-    | IDENTIFIER ASSIGN expression { $$ = new ExpressionStatementNode(new AssignmentNode($1, $3)); free($1); }
-    | IDENTIFIER LPAREN expression_list RPAREN SEMICOLON { $$ = new ExpressionStatementNode(new FuncCallNode($1, *$3)); delete $3; free($1); }
-    | IDENTIFIER LPAREN RPAREN SEMICOLON { $$ = new ExpressionStatementNode(new FuncCallNode($1, {})); free($1); }
-    | IDENTIFIER LPAREN expression_list RPAREN { $$ = new ExpressionStatementNode(new FuncCallNode($1, *$3)); delete $3; free($1); }
-    | IDENTIFIER LPAREN RPAREN { $$ = new ExpressionStatementNode(new FuncCallNode($1, {})); free($1); }
-    | LET declaration_list IN statement {
-        ASTNode* stmt = $4;
-        for (int i = $2->size()-1; i >= 0; i--) {
-            VarDeclPair pair = (*$2)[i];
-            stmt = new LetVarNode(pair.id.c_str(), pair.expr, stmt, pair.type);
-        }
-        $$ = dynamic_cast<StatementNode*>(stmt);
-        delete $2;
-    }
-    | LET declaration_list EOL IN statement {
-        ASTNode* stmt = $5;
-        for (int i = $2->size()-1; i >= 0; i--) {
-            VarDeclPair pair = (*$2)[i];
-            stmt = new LetVarNode(pair.id.c_str(), pair.expr, stmt, pair.type);
-        }
-        $$ = dynamic_cast<StatementNode*>(stmt);
-        delete $2;
-    }
-    | LET declaration_list IN EOL statement {
-        ASTNode* stmt = $5;
-        for (int i = $2->size()-1; i >= 0; i--) {
-            VarDeclPair pair = (*$2)[i];
-            stmt = new LetVarNode(pair.id.c_str(), pair.expr, stmt, pair.type);
-        }
-        $$ = dynamic_cast<StatementNode*>(stmt);
-        delete $2;
-    }
-    | LET declaration_list EOL IN EOL statement {
-        ASTNode* stmt = $6;
-        for (int i = $2->size()-1; i >= 0; i--) {
-            VarDeclPair pair = (*$2)[i];
-            stmt = new LetVarNode(pair.id.c_str(), pair.expr, stmt, pair.type);
-        }
-        $$ = dynamic_cast<StatementNode*>(stmt);
-        delete $2;
-    }
-    | LET declaration_list IN expression SEMICOLON {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $4));
-        delete $2;
-    }
-    | LET declaration_list IN expression {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $4));
-        delete $2;
-    }
-    | LET declaration_list EOL IN expression SEMICOLON {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $5));
-        delete $2;
-    }
-    | LET declaration_list EOL IN expression {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $5));
-        delete $2;
-    }
-    | LET declaration_list IN EOL expression SEMICOLON {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $5));
-        delete $2;
-    }
-    | LET declaration_list IN EOL expression {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $5));
-        delete $2;
-    }
-    | LET declaration_list EOL IN EOL expression SEMICOLON {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $6));
-        delete $2;
-    }
-    | LET declaration_list EOL IN EOL expression {
-        $$ = new ExpressionStatementNode(new LetExprNode(*$2, $6));
-        delete $2;
-    }
-    | statement_block { $$ = new BlockNode(*$1); delete $1; }
-    | FUNCTION IDENTIFIER LPAREN identifier_list RPAREN ARROW expression SEMICOLON {
-        $$ = new DefFuncNode($2, *$4, $7);
-        delete $4;
-    }
-    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type ARROW expression SEMICOLON {
-
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($2, params, $9, $7);
-        delete $4;
-        free($2);
-    }
-    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN ARROW expression SEMICOLON {
-
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($2, params, $7, nullptr);
-        delete $4;
-        free($2);
-    }
-    | FUNCTION IDENTIFIER LPAREN identifier_list RPAREN LBRACE statement_list_block RBRACE {
-        std::vector<Parameter> params;
-        for (const auto& id : *$4) {
-            params.emplace_back(id, nullptr);
-        }
-        $$ = new DefFuncNode($2, params, *$7, nullptr);
-        delete $4;
-        delete $7;
-        free($2);
-    }
-    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN LBRACE statement_list_block RBRACE {
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($2, params, *$7, nullptr);
-        delete $4;
-        delete $7;
-        free($2);
-    }
-    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type LBRACE statement_list_block RBRACE {
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($2, params, *$9, $7);
-        delete $4;
-        delete $9;
-        free($2);
-    }
-    | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct SEMICOLON {
-
-        if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
-            if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-
-                ForRangeNode* forNode = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
-                $$ = new ExpressionStatementNode(forNode);
-                funcCall->args.clear();
-                delete funcCall;
-                free($3);
-            } else {
-
-                $$ = new ExpressionStatementNode(new NumberNode(0));
-                free($3);
-            }
-        } else {
-            $$ = new ExpressionStatementNode(new NumberNode(0));
-            free($3);
-        }
-    }
-    | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct {
-
-        if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
-            if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-
-                ForRangeNode* forNode = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
-                $$ = new ExpressionStatementNode(forNode);
-                funcCall->args.clear();
-                delete funcCall;
-                free($3);
-            } else {
-
-                $$ = new ExpressionStatementNode(new NumberNode(0));
-                free($3);
-            }
-        } else {
-            $$ = new ExpressionStatementNode(new NumberNode(0));
-            free($3);
-        }
-    }
-    | TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new TypeDefNode($2, params, *$7);
-        delete $4;
-        delete $7;
-        free($2);
-    }
-    | TYPE IDENTIFIER LPAREN RPAREN LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        $$ = new TypeDefNode($2, params, *$6);
-        delete $6;
-        free($2);
-    }
-    | TYPE IDENTIFIER LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        $$ = new TypeDefNode($2, params, *$4);
-        delete $4;
-        free($2);
-    }
-    | TYPE IDENTIFIER INHERITS IDENTIFIER LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        std::vector<ExpressionNode*> parentArgs;
-        $$ = new TypeDefNode($2, params, $4, parentArgs, *$6);
-        delete $6;
-        free($2);
-        free($4);
-    }
-    | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        std::vector<ExpressionNode*> parentArgs;
-        $$ = new TypeDefNode($2, params, $7, parentArgs, *$9);
-        delete $4;
-        delete $9;
-        free($2);
-        free($7);
-    }
-    | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LPAREN expression_list RPAREN LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        for (const auto& pair : *$4) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new TypeDefNode($2, params, $7, *$9, *$12);
-        delete $4;
-        delete $9;
-        delete $12;
-        free($2);
-        free($7);
-    }
-    | TYPE IDENTIFIER INHERITS IDENTIFIER LPAREN expression_list RPAREN LBRACE type_member_list RBRACE {
-
-        std::vector<Parameter> params;
-        $$ = new TypeDefNode($2, params, $4, *$6, *$9);
-        delete $6;
-        delete $9;
-        free($2);
-        free($4);
-    }
-    ;
-
-statement_block:
-    LBRACE statement_list_block RBRACE { $$ = $2; }
-    ;
-
-statement_list_block:
     statement {
-        $$ = new std::vector<StatementNode*>;
+        $$ = new std::vector<StatementNode*>();
         $$->push_back($1);
     }
-    | statement_list_block statement {
-        $1->push_back($2);
+    | statement_list statement {
         $$ = $1;
+        $$->push_back($2);
     }
-    | statement_list_block EOL statement {
-        $1->push_back($3);
-        $$ = $1;
-    }
-    | statement_list_block EOL { $$ = $1; }
-    | EOL { $$ = new std::vector<StatementNode*>; }
-    |  { $$ = new std::vector<StatementNode*>; }
     ;
 
+/* Statement individual */
+statement:
+    declaration
+    | expression SEMICOLON {
+        $$ = new ExpressionStatementNode($1);
+    }
+    ;
+
+/* Lista de declaraciones (tipos y funciones) */
 declaration_list:
-    declaration { $$ = $1; }
-    | declaration_list COMMA EOL declaration {
+    declaration {
+        $$ = new std::vector<StatementNode*>();
+        $$->push_back($1);
+    }
+    | declaration_list declaration {
         $$ = $1;
-        for (const auto& pair : *$4) {
-            $$->push_back(pair);
-        }
+        $$->push_back($2);
+    }
+    ;
+
+/* Declaraciones (solo tipos y funciones) */
+declaration:
+    type_definition
+    | function_definition
+    ;
+
+/* Definición de tipos */
+type_definition:
+    TYPE IDENTIFIER LBRACE RBRACE {
+        // Tipo vacío sin miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), std::vector<ASTNode*>());
+        free($2);
+    }
+    | TYPE IDENTIFIER LBRACE member_list RBRACE {
+        // Tipo con miembros (atributos y métodos)
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), *$4);
+        free($2);
         delete $4;
     }
-    | declaration_list COMMA declaration {
+    | TYPE IDENTIFIER LPAREN RPAREN LBRACE RBRACE {
+        // Tipo con parámetros vacíos sin miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), std::vector<ASTNode*>());
+        free($2);
+    }
+    | TYPE IDENTIFIER LPAREN RPAREN LBRACE member_list RBRACE {
+        // Tipo con parámetros vacíos con miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), *$6);
+        free($2);
+        delete $6;
+    }
+    | TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE RBRACE {
+        // Tipo con parámetros tipados sin miembros
+        $$ = new TypeDefNode($2, *$4, std::vector<ASTNode*>());
+        free($2);
+        delete $4;
+    }
+    | TYPE IDENTIFIER LPAREN parameter_list RPAREN LBRACE member_list RBRACE {
+        // Tipo con parámetros tipados con miembros
+        $$ = new TypeDefNode($2, *$4, *$7);
+        free($2);
+        delete $4;
+        delete $7;
+    }
+    /* Tipos con herencia */
+    | TYPE IDENTIFIER INHERITS IDENTIFIER LBRACE RBRACE {
+        // Tipo que hereda sin parámetros propios, sin miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), $4, std::vector<ExpressionNode*>(), std::vector<ASTNode*>());
+        free($2);
+        free($4);
+    }
+    | TYPE IDENTIFIER INHERITS IDENTIFIER LBRACE member_list RBRACE {
+        // Tipo que hereda sin parámetros propios, con miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), $4, std::vector<ExpressionNode*>(), *$6);
+        free($2);
+        free($4);
+        delete $6;
+    }
+    | TYPE IDENTIFIER LPAREN RPAREN INHERITS IDENTIFIER LPAREN expression_list_opt RPAREN LBRACE RBRACE {
+        // Tipo con parámetros vacíos que hereda con argumentos para el padre, sin miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), $6, *$8, std::vector<ASTNode*>());
+        free($2);
+        free($6);
+        delete $8;
+    }
+    | TYPE IDENTIFIER LPAREN RPAREN INHERITS IDENTIFIER LPAREN expression_list_opt RPAREN LBRACE member_list RBRACE {
+        // Tipo con parámetros vacíos que hereda con argumentos para el padre, con miembros
+        $$ = new TypeDefNode($2, std::vector<Parameter>(), $6, *$8, *$11);
+        free($2);
+        free($6);
+        delete $8;
+        delete $11;
+    }
+    | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LPAREN expression_list_opt RPAREN LBRACE RBRACE {
+        // Tipo con parámetros que hereda con argumentos para el padre, sin miembros
+        $$ = new TypeDefNode($2, *$4, $7, *$9, std::vector<ASTNode*>());
+        free($2);
+        delete $4;
+        free($7);
+        delete $9;
+    }
+    | TYPE IDENTIFIER LPAREN parameter_list RPAREN INHERITS IDENTIFIER LPAREN expression_list_opt RPAREN LBRACE member_list RBRACE {
+        // Tipo con parámetros que hereda con argumentos para el padre, con miembros
+        $$ = new TypeDefNode($2, *$4, $7, *$9, *$12);
+        free($2);
+        delete $4;
+        free($7);
+        delete $9;
+        delete $12;
+    }
+    ;
+
+/* Lista de miembros (atributos y métodos) */
+member_list:
+    member {
+        $$ = new std::vector<ASTNode*>();
+        $$->push_back($1);
+    }
+    | member_list member {
         $$ = $1;
-        for (const auto& pair : *$3) {
-            $$->push_back(pair);
-        }
+        $$->push_back($2);
+    }
+    ;
+
+/* Miembro individual (atributo o método) */
+member:
+    /* Atributos */
+    IDENTIFIER COLON type_annotation EQUALS expression SEMICOLON {
+        $$ = new Attribute($1, $3, $5);
+        free($1);
+    }
+    | IDENTIFIER COLON type_annotation SEMICOLON {
+        $$ = new Attribute($1, $3, nullptr);
+        free($1);
+    }
+    | IDENTIFIER EQUALS expression SEMICOLON {
+        $$ = new Attribute($1, nullptr, $3);
+        free($1);
+    }
+    | IDENTIFIER SEMICOLON {
+        $$ = new Attribute($1, nullptr, nullptr);
+        free($1);
+    }
+    /* Métodos - sin parámetros con tipo de retorno */
+    | IDENTIFIER LPAREN RPAREN COLON type_annotation ARROW expression SEMICOLON {
+        // Crear un DefFuncNode con self como primer parámetro implícito
+        std::vector<Parameter> params;
+        params.emplace_back("self", nullptr);  // self sin tipo explícito
+        DefFuncNode* func = new DefFuncNode($1, params, $7);
+        func->returnType = $5;
+        $$ = func;
+        free($1);
+    }
+    /* Métodos - con parámetros y tipo de retorno */
+    | IDENTIFIER LPAREN parameter_list RPAREN COLON type_annotation ARROW expression SEMICOLON {
+        // Agregar self como primer parámetro
+        std::vector<Parameter> params;
+        params.emplace_back("self", nullptr);  // self sin tipo explícito
+        params.insert(params.end(), $3->begin(), $3->end());
+        DefFuncNode* func = new DefFuncNode($1, params, $8);
+        func->returnType = $6;
+        $$ = func;
+        free($1);
         delete $3;
     }
-    | declaration_list EOL declaration {
-        $$ = $1;
-        for (const auto& pair : *$3) {
-            $$->push_back(pair);
-        }
+    /* Métodos - sin parámetros sin tipo de retorno */
+    | IDENTIFIER LPAREN RPAREN ARROW expression SEMICOLON {
+        // Crear un DefFuncNode con self como primer parámetro implícito
+        std::vector<Parameter> params;
+        params.emplace_back("self", nullptr);  // self sin tipo explícito
+        $$ = new DefFuncNode($1, params, $5);
+        free($1);
+    }
+    /* Métodos - con parámetros sin tipo de retorno */
+    | IDENTIFIER LPAREN parameter_list RPAREN ARROW expression SEMICOLON {
+        // Agregar self como primer parámetro
+        std::vector<Parameter> params;
+        params.emplace_back("self", nullptr);  // self sin tipo explícito
+        params.insert(params.end(), $3->begin(), $3->end());
+        $$ = new DefFuncNode($1, params, $6);
+        free($1);
         delete $3;
     }
     ;
 
-declaration:
-    IDENTIFIER EQUALS expression {
-        $$ = new std::vector<VarDeclPair>;
-        VarDeclPair pair;
-        pair.id = $1;
-        pair.expr = $3;
-        pair.type = Type::getUnknownType();
-        $$->push_back(pair);
+/* Lista de atributos */
+attribute_list:
+    attribute {
+        $$ = new std::vector<Attribute>();
+        $$->push_back(*$1);
+        delete $1;
+    }
+    | attribute_list attribute {
+        $$ = $1;
+        $$->push_back(*$2);
+        delete $2;
+    }
+    ;
+
+/* Atributo individual */
+attribute:
+    IDENTIFIER COLON type_annotation EQUALS expression SEMICOLON {
+        $$ = new Attribute($1, $3, $5);
         free($1);
     }
-    | IDENTIFIER COLON type EQUALS expression {
-        $$ = new std::vector<VarDeclPair>;
-        VarDeclPair pair;
-        pair.id = $1;
-        pair.expr = $5;
-        pair.type = $3;
-        $$->push_back(pair);
+    | IDENTIFIER COLON type_annotation SEMICOLON {
+        $$ = new Attribute($1, $3, nullptr);
+        free($1);
+    }
+    | IDENTIFIER EQUALS expression SEMICOLON {
+        $$ = new Attribute($1, nullptr, $3);
+        free($1);
+    }
+    | IDENTIFIER SEMICOLON {
+        $$ = new Attribute($1, nullptr, nullptr);
         free($1);
     }
     ;
 
-type:
-    TYPE_NUMBER { $$ = Type::getNumberType(); }
-    | TYPE_STRING { $$ = Type::getStringType(); }
-    | TYPE_BOOLEAN { $$ = Type::getBooleanType(); }
+/* Anotación de tipo */
+type_annotation:
+    TYPE_NUMBER {
+        $$ = Type::getNumberType();
+    }
+    | TYPE_STRING {
+        $$ = Type::getStringType();
+    }
+    | TYPE_BOOLEAN {
+        $$ = Type::getBooleanType();
+    }
     | IDENTIFIER {
-
-        Type* foundType = getTypeByName($1);
-        $$ = foundType;
+        // Tipo definido por el usuario
+        $$ = Type::createUserDefinedType($1, nullptr);
         free($1);
     }
     ;
 
+/* Definición de función */
+function_definition:
+    /* Función inline sin parámetros sin tipo de retorno */
+    FUNCTION IDENTIFIER LPAREN RPAREN ARROW expression SEMICOLON {
+        $$ = new DefFuncNode($2, std::vector<std::string>(), $6);
+        free($2);
+    }
+    /* Función inline sin parámetros con tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN RPAREN COLON type_annotation ARROW expression SEMICOLON {
+        DefFuncNode* func = new DefFuncNode($2, std::vector<std::string>(), $8);
+        func->returnType = $6;
+        $$ = func;
+        free($2);
+    }
+    /* Función inline con parámetros sin tipo de retorno (usando identifier_list) */
+    | FUNCTION IDENTIFIER LPAREN identifier_list RPAREN ARROW expression SEMICOLON {
+        $$ = new DefFuncNode($2, *$4, $7);
+        free($2);
+        delete $4;
+    }
+    /* Función inline con parámetros tipados sin tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN ARROW expression SEMICOLON {
+        $$ = new DefFuncNode($2, *$4, $7);
+        free($2);
+        delete $4;
+    }
+    /* Función inline con parámetros tipados y tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type_annotation ARROW expression SEMICOLON {
+        DefFuncNode* func = new DefFuncNode($2, *$4, $9);
+        func->returnType = $7;
+        $$ = func;
+        free($2);
+        delete $4;
+    }
+    /* Función con bloque sin parámetros sin tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN RPAREN LBRACE expression_sequence RBRACE {
+        // Convertir expresiones a statements
+        std::vector<StatementNode*> stmts;
+        for (auto expr : *$6) {
+            stmts.push_back(new ExpressionStatementNode(expr));
+        }
+        $$ = new DefFuncNode($2, std::vector<Parameter>(), stmts);
+        free($2);
+        delete $6;
+    }
+    /* Función con bloque sin parámetros con tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN RPAREN COLON type_annotation LBRACE expression_sequence RBRACE {
+        // Convertir expresiones a statements
+        std::vector<StatementNode*> stmts;
+        for (auto expr : *$8) {
+            stmts.push_back(new ExpressionStatementNode(expr));
+        }
+        DefFuncNode* func = new DefFuncNode($2, std::vector<Parameter>(), stmts);
+        func->returnType = $6;
+        $$ = func;
+        free($2);
+        delete $8;
+    }
+    /* Función con bloque con parámetros sin tipo de retorno (usando identifier_list) */
+    | FUNCTION IDENTIFIER LPAREN identifier_list RPAREN LBRACE expression_sequence RBRACE {
+        // Convertir expresiones a statements
+        std::vector<StatementNode*> stmts;
+        for (auto expr : *$7) {
+            stmts.push_back(new ExpressionStatementNode(expr));
+        }
+        // Convertir strings a Parameters
+        std::vector<Parameter> params;
+        for (const auto& paramName : *$4) {
+            params.emplace_back(paramName, nullptr);
+        }
+        $$ = new DefFuncNode($2, params, stmts);
+        free($2);
+        delete $4;
+        delete $7;
+    }
+    /* Función con bloque con parámetros tipados sin tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN LBRACE expression_sequence RBRACE {
+        // Convertir expresiones a statements
+        std::vector<StatementNode*> stmts;
+        for (auto expr : *$7) {
+            stmts.push_back(new ExpressionStatementNode(expr));
+        }
+        $$ = new DefFuncNode($2, *$4, stmts);
+        free($2);
+        delete $4;
+        delete $7;
+    }
+    /* Función con bloque con parámetros tipados y tipo de retorno */
+    | FUNCTION IDENTIFIER LPAREN parameter_list RPAREN COLON type_annotation LBRACE expression_sequence RBRACE {
+        // Convertir expresiones a statements
+        std::vector<StatementNode*> stmts;
+        for (auto expr : *$9) {
+            stmts.push_back(new ExpressionStatementNode(expr));
+        }
+        DefFuncNode* func = new DefFuncNode($2, *$4, stmts);
+        func->returnType = $7;
+        $$ = func;
+        free($2);
+        delete $4;
+        delete $9;
+    }
+    ;
+
+/* Lista de identificadores para parámetros de función */
+identifier_list:
+    IDENTIFIER {
+        $$ = new std::vector<std::string>();
+        $$->push_back($1);
+        free($1);
+    }
+    | identifier_list COMMA IDENTIFIER {
+        $$ = $1;
+        $$->push_back($3);
+        free($3);
+    }
+    ;
+
+/* Expresiones */
 expression:
-    postfix_expression { $$ = $1; }
-    | expression PLUS expression { $$ = new AdditionNode($1, $3); }
-    | expression MINUS expression { $$ = new SubtractionNode($1, $3); }
-    | expression MULTIPLY expression { $$ = new MultiplicationNode($1, $3); }
-    | expression DIVIDE expression { $$ = new DivisionNode($1, $3); }
-    | expression MODULO expression { $$ = new ModuloNode($1, $3); }
-    | expression POWER expression { $$ = new PowerNode($1, $3); }
-    | expression CONCAT expression { $$ = new ConcatenationNode($1, $3); }
+    primary_expression
+    /* Operadores binarios */
+    | expression PLUS expression {
+        $$ = new AdditionNode($1, $3);
+    }
+    | expression MINUS expression {
+        $$ = new SubtractionNode($1, $3);
+    }
+    | expression MULTIPLY expression {
+        $$ = new MultiplicationNode($1, $3);
+    }
+    | expression DIVIDE expression {
+        $$ = new DivisionNode($1, $3);
+    }
+    | expression MODULO expression {
+        $$ = new ModuloNode($1, $3);
+    }
+    | expression POWER expression {
+        $$ = new PowerNode($1, $3);
+    }
+    | expression CONCAT expression {
+        $$ = new ConcatenationNode($1, $3);
+    }
     | expression CONCAT_SPACE expression {
-        ExpressionNode* space = new StringLiteralNode(strdup(" "));
+        // @@ is equivalent to @ " " @
+        ExpressionNode* space = new StringLiteralNode(" ");
         ExpressionNode* leftConcat = new ConcatenationNode($1, space);
         $$ = new ConcatenationNode(leftConcat, $3);
     }
-    | expression EQEQ expression { $$ = new EqualNode($1, $3); }
-    | expression NOTEQ expression { $$ = new NotEqualNode($1, $3); }
-    | expression LESS expression { $$ = new LessNode($1, $3); }
-    | expression LESSEQ expression { $$ = new LessEqNode($1, $3); }
-    | expression GREATER expression { $$ = new GreaterNode($1, $3); }
-    | expression GREATEREQ expression { $$ = new GreaterEqNode($1, $3); }
-    | expression IS IDENTIFIER { $$ = new IsNode($1, $3); free($3); }
-    | expression IS TYPE_NUMBER { $$ = new IsNode($1, "Number"); }
-    | expression IS TYPE_STRING { $$ = new IsNode($1, "String"); }
-    | expression IS TYPE_BOOLEAN { $$ = new IsNode($1, "Boolean"); }
-    | expression IS TRUE { $$ = new IsNode($1, "Boolean"); }
-    | expression IS FALSE { $$ = new IsNode($1, "Boolean"); }
-    | expression AS IDENTIFIER { $$ = new AsNode($1, $3); free($3); }
-    | expression AND expression { $$ = new AndNode($1, $3); }
-    | expression OR expression { $$ = new OrNode($1, $3); }
-    | NOT expression { $$ = new NotNode($2); }
-    | MINUS expression %prec NOT { $$ = new UnaryMinusNode($2); }
-    | IDENTIFIER ASSIGN expression { $$ = new AssignmentNode($1, $3); free($1); }
-    | postfix_expression ASSIGN expression { 
-        if (auto memberAccess = dynamic_cast<MemberAccessNode*>($1)) {
-            $$ = new MemberAssignmentNode(memberAccess->object, memberAccess->memberName, $3);
-            delete memberAccess;
-        } else if (auto selfMemberAccess = dynamic_cast<SelfMemberAccessNode*>($1)) {
-            $$ = new SelfMemberAssignmentNode(selfMemberAccess->attributeName, $3);
-            delete selfMemberAccess;
-        } else {
-            $$ = new AssignmentNode("", $3);
-        }
+    /* Operadores de comparación */
+    | expression EQEQ expression {
+        $$ = new EqualNode($1, $3);
     }
-    | IF expression ast_construct ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->setElse($5);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->setElse($6);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct ELSE EOL ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->setElse($6);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELSE EOL ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->setElse($7);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct ELIF expression ast_construct ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($5, $6);
-            condNode->setElse($8);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct ELIF expression ast_construct EOL ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($5, $6);
-            condNode->setElse($9);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct ELIF expression ast_construct ELSE EOL ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($5, $6);
-            condNode->setElse($9);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELIF expression ast_construct ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($6, $7);
-            condNode->setElse($9);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELIF expression ast_construct EOL ELSE ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($6, $7);
-            condNode->setElse($10);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELIF expression ast_construct ELSE EOL ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($6, $7);
-            condNode->setElse($10);
-            $$ = condNode ;
-        }
-    | IF expression ast_construct EOL ELIF expression ast_construct EOL ELSE EOL ast_construct {
-            ConditionalNode* condNode = new ConditionalNode();
-            condNode->addBranch($2, $3);
-            condNode->addBranch($6, $7);
-            condNode->setElse($11);
-            $$ = condNode ;
-        }
-
-    | LET declaration_list IN expression { $$ = new LetExprNode(*$2, $4); delete $2; }
-    | LET declaration_list EOL IN expression { $$ = new LetExprNode(*$2, $5); delete $2; }
-    | LET declaration_list IN EOL expression { $$ = new LetExprNode(*$2, $5); delete $2; }
-    | LET declaration_list EOL IN EOL expression { $$ = new LetExprNode(*$2, $6); delete $2; }
-    | WHILE LPAREN expression RPAREN ast_construct { $$ = new WhileNode($3, $5); }
-    | WHILE expression ast_construct { $$ = new WhileNode($2, $3); }
-    | FOR LPAREN IDENTIFIER IN expression RPAREN ast_construct {
-
-        if (auto* funcCall = dynamic_cast<FuncCallNode*>($5)) {
-            if (funcCall->identifier == "range" && funcCall->args.size() == 2) {
-
-                $$ = new ForRangeNode($3, funcCall->args[0], funcCall->args[1], $7);
-
-                funcCall->args.clear();
-                delete funcCall;
-                free($3);
-            } else {
-
-
-                std::string iterableVar = std::string("_iterable_") + $3;
-
-                ExpressionNode* nextCall = new FuncCallNode("next", {new VariableNode(iterableVar.c_str())});
-                ExpressionNode* currentCall = new FuncCallNode("current", {new VariableNode(iterableVar.c_str())});
-
-                std::vector<VarDeclPair> innerDecls;
-                VarDeclPair innerPair;
-                innerPair.id = $3;
-                innerPair.expr = currentCall;
-                innerPair.type = Type::getUnknownType();
-                innerDecls.push_back(innerPair);
-
-                ASTNode* letBody = nullptr;
-                if (dynamic_cast<ExpressionNode*>($7)) {
-                    letBody = new LetExprNode(innerDecls, dynamic_cast<ExpressionNode*>($7));
-                } else {
-                    letBody = new LetVarNode($3, currentCall, $7, Type::getUnknownType());
-                }
-
-                WhileNode* whileLoop = new WhileNode(nextCall, letBody);
-
-                std::vector<VarDeclPair> outerDecls;
-                VarDeclPair outerPair;
-                outerPair.id = iterableVar;
-                outerPair.expr = $5;
-                outerPair.type = Type::getUnknownType();
-                outerDecls.push_back(outerPair);
-
-                $$ = new LetExprNode(outerDecls, whileLoop);
-                free($3);
-            }
-        } else {
-
-            std::string iterableVar = std::string("_iterable_") + $3;
-
-            ExpressionNode* nextCall = new FuncCallNode("next", {new VariableNode(iterableVar.c_str())});
-            ExpressionNode* currentCall = new FuncCallNode("current", {new VariableNode(iterableVar.c_str())});
-
-            std::vector<VarDeclPair> innerDecls;
-            VarDeclPair innerPair;
-            innerPair.id = $3;
-            innerPair.expr = currentCall;
-            innerPair.type = Type::getUnknownType();
-            innerDecls.push_back(innerPair);
-
-            ASTNode* letBody = nullptr;
-            if (dynamic_cast<ExpressionNode*>($7)) {
-                letBody = new LetExprNode(innerDecls, dynamic_cast<ExpressionNode*>($7));
-            } else {
-                letBody = new LetVarNode($3, currentCall, $7, Type::getUnknownType());
-            }
-
-            WhileNode* whileLoop = new WhileNode(nextCall, letBody);
-
-            std::vector<VarDeclPair> outerDecls;
-            VarDeclPair outerPair;
-            outerPair.id = iterableVar;
-            outerPair.expr = $5;
-            outerPair.type = Type::getUnknownType();
-            outerDecls.push_back(outerPair);
-
-            $$ = new LetExprNode(outerDecls, whileLoop);
-            free($3);
-        }
+    | expression NOTEQ expression {
+        $$ = new NotEqualNode($1, $3);
     }
-    | LBRACE expression_block RBRACE {
+    | expression LESS expression {
+        $$ = new LessNode($1, $3);
+    }
+    | expression LESSEQ expression {
+        $$ = new LessEqNode($1, $3);
+    }
+    | expression GREATER expression {
+        $$ = new GreaterNode($1, $3);
+    }
+    | expression GREATEREQ expression {
+        $$ = new GreaterEqNode($1, $3);
+    }
+    /* Operadores lógicos */
+    | expression AND expression {
+        $$ = new AndNode($1, $3);
+    }
+    | expression OR expression {
+        $$ = new OrNode($1, $3);
+    }
+    /* Operador unario */
+    | MINUS expression %prec UMINUS {
+        $$ = new UnaryMinusNode($2);
+    }
+    | NOT expression {
+        $$ = new NotNode($2);
+    }
+    /* Asignación */
+    | IDENTIFIER ASSIGN expression {
+        $$ = new AssignmentNode($1, $3);
+        free($1);
+    }
+    /* Asignación a miembro */
+    | expression DOT IDENTIFIER ASSIGN expression {
+        // Check if the expression is a variable node with identifier "self"
+        VariableNode* var = dynamic_cast<VariableNode*>($1);
+        if (var && var->identifier == "self") {
+            $$ = new SelfMemberAssignmentNode($3, $5);
+            delete $1; // Delete the temporary VariableNode
+        } else {
+            $$ = new MemberAssignmentNode($1, $3, $5);
+        }
+        free($3);
+    }
+    /* Llamadas */
+    | IDENTIFIER LPAREN expression_list_opt RPAREN {
+        $$ = new FuncCallNode($1, *$3);
+        free($1);
+        delete $3;
+    }
+    /* Expresión let-in con múltiples variables */
+    | LET var_decl_list IN expression {
+        $$ = new LetExprNode(*$2, $4);
+        delete $2;
+    }
+    /* Expresión if con soporte para elif */
+    | IF LPAREN expression RPAREN expression elif_list ELSE expression {
+        ConditionalNode* cond = new ConditionalNode();
+        cond->addBranch($3, $5);
+        // Agregar todas las ramas elif
+        for (auto& branch : *$6) {
+            cond->addBranch(branch.first, branch.second);
+        }
+        cond->setElse($8);
+        $$ = cond;
+        delete $6;
+    }
+    /* Expresión if sin elif */
+    | IF LPAREN expression RPAREN expression ELSE expression {
+        ConditionalNode* cond = new ConditionalNode();
+        cond->addBranch($3, $5);
+        cond->setElse($7);
+        $$ = cond;
+    }
+    /* Expresión while */
+    | WHILE LPAREN expression RPAREN expression {
+        $$ = new WhileNode($3, $5);
+    }
+    /* Expresión for con range */
+    | FOR LPAREN IDENTIFIER IN IDENTIFIER LPAREN expression COMMA expression RPAREN RPAREN expression {
+        // Verificar que el identificador sea "range"
+        if (std::string($5) != "range") {
+            yyerror("Expected 'range' in for loop");
+            $$ = nullptr;
+        } else {
+            $$ = new ForRangeNode($3, $7, $9, $12);
+        }
+        free($3);
+        free($5);
+    }
+    /* Bloque de expresiones */
+    | LBRACE expression_sequence RBRACE {
         $$ = new BlockExprNode(*$2);
         delete $2;
     }
-    ;
-
-postfix_expression:
-    primary_expression { $$ = $1; }
-    | postfix_expression DOT IDENTIFIER {
-
-        if (auto varNode = dynamic_cast<VariableNode*>($1)) {
-            if (varNode->identifier == "self") {
-
-                $$ = new SelfMemberAccessNode($3);
-                delete varNode;
-            } else {
-                $$ = new MemberAccessNode($1, $3);
-            }
+    /* Acceso a miembro */
+    | expression DOT IDENTIFIER {
+        // Check if the expression is a variable node with identifier "self"
+        VariableNode* var = dynamic_cast<VariableNode*>($1);
+        if (var && var->identifier == "self") {
+            $$ = new SelfMemberAccessNode($3);
+            delete $1; // Delete the temporary VariableNode
         } else {
             $$ = new MemberAccessNode($1, $3);
         }
         free($3);
     }
-    | postfix_expression DOT IDENTIFIER LPAREN expression_list RPAREN {
+    /* Llamada a método */
+    | expression DOT IDENTIFIER LPAREN expression_list_opt RPAREN {
         $$ = new MethodCallNode($1, $3, *$5);
+        free($3);
         delete $5;
+    }
+    /* Type checking with is operator */
+    | expression IS IDENTIFIER {
+        $$ = new IsNode($1, $3);
         free($3);
     }
-    | postfix_expression DOT IDENTIFIER LPAREN RPAREN {
-        $$ = new MethodCallNode($1, $3, {});
+    | expression IS TYPE_NUMBER {
+        $$ = new IsNode($1, "Number");
+    }
+    | expression IS TYPE_STRING {
+        $$ = new IsNode($1, "String");
+    }
+    | expression IS TYPE_BOOLEAN {
+        $$ = new IsNode($1, "Boolean");
+    }
+    /* Type casting with as operator */
+    | expression AS IDENTIFIER {
+        $$ = new AsNode($1, $3);
         free($3);
     }
-    | IDENTIFIER LPAREN expression_list RPAREN { $$ = new FuncCallNode($1, *$3); delete $3; }
-    | IDENTIFIER LPAREN RPAREN { $$ = new FuncCallNode($1, {}); }
+    | expression AS TYPE_NUMBER {
+        $$ = new AsNode($1, "Number");
+    }
+    | expression AS TYPE_STRING {
+        $$ = new AsNode($1, "String");
+    }
+    | expression AS TYPE_BOOLEAN {
+        $$ = new AsNode($1, "Boolean");
+    }
     ;
 
+/* Expresiones primarias */
 primary_expression:
-    NUMBER { 
-
-        std::string token_str(yytext);
-        if (token_str.find('.') != std::string::npos) {
-            $$ = new NumberNode(yylval.decimal);
-        } else {
-            $$ = new NumberNode($1);
-        }
+    NUMBER {
+        $$ = new NumberNode($1);
     }
-    | STRING { $$ = new StringLiteralNode($1); }
-    | TRUE { $$ = new BooleanNode(true); }
-    | FALSE { $$ = new BooleanNode(false); }
-    | IDENTIFIER { $$ = new VariableNode($1); }
-    | LPAREN expression RPAREN { $$ = $2; }
-    | LPAREN statement RPAREN { 
-        if (auto* exprStmt = dynamic_cast<ExpressionStatementNode*>($2)) {
-            $$ = exprStmt->expression;
-        } else if (auto* printStmt = dynamic_cast<PrintStatementNode*>($2)) {
-
-            $$ = new PrintExpressionNode(printStmt->expression);
-            printStmt->expression = nullptr;
-            delete printStmt;
-        } else {
-            $$ = new NumberNode(0);
-        }
+    | STRING {
+        $$ = new StringLiteralNode($1);
+        free($1);
     }
-    | NEW IDENTIFIER LPAREN expression_list RPAREN {
+    | TRUE {
+        $$ = new BooleanNode(true);
+    }
+    | FALSE {
+        $$ = new BooleanNode(false);
+    }
+    | IDENTIFIER {
+        $$ = new VariableNode($1);
+        free($1);
+    }
+    | LPAREN expression RPAREN {
+        $$ = $2;
+    }
+    /* Constantes matemáticas */
+    | PI {
+        $$ = new NumberNode(3.14159265358979323846);
+    }
+    | E {
+        $$ = new NumberNode(2.71828182845904523536);
+    }
+    /* Funciones builtin */
+    | PRINT LPAREN expression RPAREN {
+        $$ = new PrintExpressionNode($3);
+    }
+    | SQRT LPAREN expression RPAREN {
+        std::vector<ExpressionNode*> args;
+        args.push_back($3);
+        $$ = new FuncCallNode("sqrt", args);
+    }
+    | SIN LPAREN expression RPAREN {
+        std::vector<ExpressionNode*> args;
+        args.push_back($3);
+        $$ = new FuncCallNode("sin", args);
+    }
+    | COS LPAREN expression RPAREN {
+        std::vector<ExpressionNode*> args;
+        args.push_back($3);
+        $$ = new FuncCallNode("cos", args);
+    }
+    | EXP LPAREN expression RPAREN {
+        std::vector<ExpressionNode*> args;
+        args.push_back($3);
+        $$ = new FuncCallNode("exp", args);
+    }
+    | LOG LPAREN expression COMMA expression RPAREN {
+        std::vector<ExpressionNode*> args;
+        args.push_back($3);
+        args.push_back($5);
+        $$ = new FuncCallNode("log", args);
+    }
+    | RAND LPAREN RPAREN {
+        std::vector<ExpressionNode*> args;
+        $$ = new FuncCallNode("rand", args);
+    }
+    /* Type instantiation */
+    | NEW IDENTIFIER LPAREN expression_list_opt RPAREN {
         $$ = new TypeInstantiationNode($2, *$4);
+        free($2);
         delete $4;
-        free($2);
     }
-    | NEW IDENTIFIER LPAREN RPAREN {
-        $$ = new TypeInstantiationNode($2, {});
-        free($2);
-    }
-    | BASE LPAREN expression_list RPAREN {
+    /* Base call */
+    | BASE LPAREN expression_list_opt RPAREN {
         $$ = new BaseCallNode(*$3);
         delete $3;
     }
-    | BASE LPAREN RPAREN {
-        $$ = new BaseCallNode({});
+    ;
+
+/* Lista de expresiones (opcional) */
+expression_list_opt:
+    /* vacío */ {
+        $$ = new std::vector<ExpressionNode*>();
+    }
+    | expression_list {
+        $$ = $1;
     }
     ;
 
+/* Lista de expresiones */
 expression_list:
-    expression { $$ = new std::vector<ExpressionNode*>; $$->push_back($1); }
-    | expression_list COMMA EOL expression { $1->push_back($4); $$ = $1; }
-    | expression_list COMMA expression { $1->push_back($3); $$ = $1; }
-    | expression_list EOL expression { $1->push_back($3); $$ = $1; }
-    ;
-
-identifier_list:
-    IDENTIFIER { $$ = new std::vector<std::string>; $$->push_back($1); }
-    | identifier_list COMMA EOL IDENTIFIER { $1->push_back($4); $$ = $1; }
-    | identifier_list COMMA IDENTIFIER { $1->push_back($3); $$ = $1; }
-    | identifier_list EOL IDENTIFIER { $1->push_back($3); $$ = $1; }
-    |  { $$ = new std::vector<std::string>; }
-    ;
-
-parameter_list:
-    parameter { $$ = $1; }
-    | parameter_list COMMA EOL parameter {
+    expression {
+        $$ = new std::vector<ExpressionNode*>();
+        $$->push_back($1);
+    }
+    | expression_list COMMA expression {
         $$ = $1;
-        for (const auto& pair : *$4) {
-            $$->push_back(pair);
-        }
-        delete $4;
+        $$->push_back($3);
+    }
+    ;
+
+/* Secuencia de expresiones (para bloques y múltiples expresiones) */
+expression_sequence:
+    expression SEMICOLON {
+        $$ = new std::vector<ExpressionNode*>();
+        $$->push_back($1);
+    }
+    | expression_sequence expression SEMICOLON {
+        $$ = $1;
+        $$->push_back($2);
+    }
+    ;
+
+/* Lista de declaraciones de variables para let */
+var_decl_list:
+    var_decl {
+        $$ = new std::vector<VarDeclPair>();
+        $$->push_back(*$1);
+        delete $1;
+    }
+    | var_decl_list COMMA var_decl {
+        $$ = $1;
+        $$->push_back(*$3);
+        delete $3;
+    }
+    ;
+
+/* Declaración individual de variable */
+var_decl:
+    IDENTIFIER EQUALS expression {
+        $$ = new VarDeclPair();
+        $$->id = $1;
+        $$->expr = $3;
+        $$->type = nullptr;
+        free($1);
+    }
+    | IDENTIFIER COLON type_annotation EQUALS expression {
+        $$ = new VarDeclPair();
+        $$->id = $1;
+        $$->expr = $5;
+        $$->type = $3;
+        free($1);
+    }
+    | LET IDENTIFIER EQUALS expression {
+        $$ = new VarDeclPair();
+        $$->id = $2;
+        $$->expr = $4;
+        $$->type = nullptr;
+        free($2);
+    }
+    | LET IDENTIFIER COLON type_annotation EQUALS expression {
+        $$ = new VarDeclPair();
+        $$->id = $2;
+        $$->expr = $6;
+        $$->type = $4;
+        free($2);
+    }
+    ;
+
+/* Lista de cláusulas elif */
+elif_list:
+    ELIF LPAREN expression RPAREN expression {
+        $$ = new std::vector<std::pair<ExpressionNode*, ExpressionNode*>>();
+        $$->push_back(std::make_pair($3, $5));
+    }
+    | elif_list ELIF LPAREN expression RPAREN expression {
+        $$ = $1;
+        $$->push_back(std::make_pair($4, $6));
+    }
+    ;
+
+/* Lista de parámetros */
+parameter_list:
+    parameter {
+        $$ = new std::vector<Parameter>();
+        $$->push_back(*$1);
+        delete $1;
     }
     | parameter_list COMMA parameter {
         $$ = $1;
-        for (const auto& pair : *$3) {
-            $$->push_back(pair);
-        }
+        $$->push_back(*$3);
         delete $3;
     }
-    | parameter_list EOL parameter {
-        $$ = $1;
-        for (const auto& pair : *$3) {
-            $$->push_back(pair);
-        }
-        delete $3;
-    }
-    |  { $$ = new std::vector<VarDeclPair>; }
     ;
 
+/* Parámetro individual */
 parameter:
     IDENTIFIER {
-        $$ = new std::vector<VarDeclPair>;
-        VarDeclPair pair;
-        pair.id = $1;
-        pair.expr = nullptr;
-        pair.type = nullptr;
-        $$->push_back(pair);
+        $$ = new Parameter($1, nullptr);
         free($1);
     }
-    | IDENTIFIER COLON type {
-        $$ = new std::vector<VarDeclPair>;
-        VarDeclPair pair;
-        pair.id = $1;
-        pair.expr = nullptr;
-        pair.type = $3;
-        $$->push_back(pair);
-        free($1);
-    }
-    ;
-
-ast_construct:
-    expression { $$ = $1; }
-    | statement  { $$ = $1; }
-    ;
-
-expression_block:
-    expression {
-        $$ = new std::vector<ExpressionNode*>;
-        $$->push_back($1);
-    }
-    | expression SEMICOLON {
-        $$ = new std::vector<ExpressionNode*>;
-        $$->push_back($1);
-    }
-    | expression_block expression {
-        $1->push_back($2);
-        $$ = $1;
-    }
-    | expression_block expression SEMICOLON {
-        $1->push_back($2);
-        $$ = $1;
-    }
-    | expression_block EOL {
-        $$ = $1;
-    }
-    | EOL {
-        $$ = new std::vector<ExpressionNode*>;
-    }
-    | {
-        $$ = new std::vector<ExpressionNode*>;
-    }
-    ;
-
-
-type_member_list:
-    { $$ = new std::vector<ASTNode*>; }
-    | type_member_list type_member {
-        $1->push_back($2);
-        $$ = $1;
-    }
-    ;
-
-type_member:
-    IDENTIFIER EQUALS expression SEMICOLON {
-        $$ = new Attribute($1, nullptr, $3);
-        free($1);
-    }
-    | IDENTIFIER COLON type EQUALS expression SEMICOLON {
-        $$ = new Attribute($1, $3, $5);
-        free($1);
-    }
-    | IDENTIFIER LPAREN parameter_list RPAREN ARROW expression SEMICOLON {
-        std::vector<Parameter> params;
-        for (const auto& pair : *$3) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($1, params, $6, nullptr);
-        delete $3;
-        free($1);
-    }
-    | IDENTIFIER LPAREN RPAREN ARROW expression SEMICOLON {
-        std::vector<Parameter> params;
-        $$ = new DefFuncNode($1, params, $5, nullptr);
-        free($1);
-    }
-    | IDENTIFIER LPAREN parameter_list RPAREN COLON type ARROW expression SEMICOLON {
-        std::vector<Parameter> params;
-        for (const auto& pair : *$3) {
-            params.emplace_back(pair.id, pair.type);
-        }
-        $$ = new DefFuncNode($1, params, $8, $6);
-        delete $3;
-        free($1);
-    }
-    | IDENTIFIER LPAREN RPAREN COLON type ARROW expression SEMICOLON {
-        std::vector<Parameter> params;
-        $$ = new DefFuncNode($1, params, $7, $5);
+    | IDENTIFIER COLON type_annotation {
+        $$ = new Parameter($1, $3);
         free($1);
     }
     ;
@@ -849,5 +879,5 @@ type_member:
 %%
 
 void yyerror(const char* s) {
-    std::cerr << "Error: " << s << " en línea " << line_count << ", cerca de '" << yytext << "'" << std::endl;
+    std::cerr << "Error sintáctico: " << s << " en línea " << line_count << ", cerca de '" << yytext << "'" << std::endl;
 }

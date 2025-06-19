@@ -39,7 +39,15 @@ static std::unordered_map<std::string, int> keywords = {
     {"as", AS},
     {"Number", TYPE_NUMBER},
     {"String", TYPE_STRING},
-    {"Boolean", TYPE_BOOLEAN}
+    {"Boolean", TYPE_BOOLEAN},
+    {"PI", PI},
+    {"E", E},
+    {"sqrt", SQRT},
+    {"sin", SIN},
+    {"cos", COS},
+    {"exp", EXP},
+    {"log", LOG},
+    {"rand", RAND}
 };
 
 void FlexCompatibleLexer::setInput(const std::string& input) {

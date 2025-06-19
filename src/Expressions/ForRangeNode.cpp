@@ -15,7 +15,7 @@ int ForRangeNode::evaluate() const {
     int end = endExpr->evaluate();
     int lastValue = 0;
     
-    
+    // Save the original value of the loop variable if it exists
     std::string originalValue;
     bool hadOriginalValue = false;
     if (variables.find(loopVar) != variables.end()) {
@@ -23,7 +23,7 @@ int ForRangeNode::evaluate() const {
         hadOriginalValue = true;
     }
     
-    
+    // Execute the loop
     for (int i = start; i < end; i++) {
         variables[loopVar] = std::to_string(i);
         
@@ -31,20 +31,12 @@ int ForRangeNode::evaluate() const {
             lastValue = exprBody->evaluate();
         } else if (auto* stmtBody = dynamic_cast<StatementNode*>(body)) {
             stmtBody->execute();
-
-
-            if (auto* exprStmt = dynamic_cast<ExpressionStatementNode*>(stmtBody)) {
-                if (auto* assignExpr = dynamic_cast<AssignmentNode*>(exprStmt->expression)) {
-
-                    if (variables.find(assignExpr->identifier) != variables.end()) {
-                        lastValue = std::stoi(variables[assignExpr->identifier]);
-                    }
-                }
-            }
+            // For statement bodies, we don't have a return value
+            // but we keep lastValue as 0
         }
     }
     
-    
+    // Restore the original value of the loop variable
     if (hadOriginalValue) {
         variables[loopVar] = originalValue;
     } else {

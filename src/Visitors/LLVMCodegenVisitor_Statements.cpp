@@ -3,6 +3,8 @@
 #include "Statements/LetVarNode.hpp"
 #include "Statements/BlockNode.hpp"
 #include "Statements/ExpressionStatementNode.hpp"
+#include "Statements/DefFuncNode.hpp"
+#include "Statements/TypeDefNode.hpp"
 #include "AST/Program.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
 #include "Expressions/NumberNode.hpp"
@@ -13,6 +15,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <iostream>
+#include <typeinfo>
 
 
 static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::Type* type, const std::string& varName) {
@@ -53,7 +56,8 @@ void LLVMCodegenVisitor::visit(PrintStatementNode& node) {
 
         formatStr = builder.CreateGlobalStringPtr("%d\n");
     } else if (val->getType()->isDoubleTy()) {
-
+        // For printing doubles, we'll convert to int if it's a whole number
+        // This is a simple approach - you might want to make this more sophisticated
         formatStr = builder.CreateGlobalStringPtr("%.6g\n");
     } else {
 
@@ -125,6 +129,31 @@ void LLVMCodegenVisitor::visit(ExpressionStatementNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(Program& node) {
+    // First pass: Process type definitions (they generate their own functions)
+    for (StatementNode* stmt : node.Statements) {
+        if (dynamic_cast<TypeDefNode*>(stmt)) {
+            std::cerr << "DEBUG: Processing TypeDefNode in first pass" << std::endl;
+            stmt->accept(*this);
+        }
+    }
+    
+    // Second pass: Forward declare all functions
+    for (StatementNode* stmt : node.Statements) {
+        if (DefFuncNode* funcNode = dynamic_cast<DefFuncNode*>(stmt)) {
+            // Create function declaration
+            std::vector<llvm::Type*> paramTypes;
+            for (const auto& param : funcNode->parameters) {
+                // Default to double for now
+                paramTypes.push_back(llvm::Type::getDoubleTy(ctx));
+            }
+            
+            llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
+            llvm::FunctionType* funcType = llvm::FunctionType::get(returnType, paramTypes, false);
+            
+            // Just create the function declaration, don't generate body yet
+            llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, funcNode->identifier, module);
+        }
+    }
 
     llvm::FunctionType* mainFuncType = llvm::FunctionType::get(llvm::Type::getInt32Ty(ctx), false);
     llvm::Function* mainFunc = llvm::Function::Create(mainFuncType, llvm::Function::ExternalLinkage, "main", module);
@@ -141,6 +170,11 @@ void LLVMCodegenVisitor::visit(Program& node) {
 
 
     for (StatementNode* stmt : node.Statements) {
+        // Skip type definitions as they were already processed
+        if (dynamic_cast<TypeDefNode*>(stmt)) {
+            continue;
+        }
+        std::cerr << "DEBUG: Processing statement type: " << typeid(*stmt).name() << std::endl;
         stmt->accept(*this);
     }
 

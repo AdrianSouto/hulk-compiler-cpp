@@ -1,8 +1,10 @@
 #include "Expressions/LetExprNode.hpp"
 #include "Context/Context.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp" 
+#include "Globals.hpp"
 #include <stdexcept>
 #include <iostream>
+#include <map>
 
 LetExprNode::LetExprNode(const std::vector<VarDeclPair>& decls, ExpressionNode* expr)
     : declarations(decls), body(expr) {}
@@ -15,18 +17,33 @@ LetExprNode::~LetExprNode() {
 }
 
 int LetExprNode::evaluate() const {
-    
-    Context context;
-    
-    
+    // Save original values of variables that will be shadowed
+    std::map<std::string, std::string> savedValues;
     for (const auto& decl : declarations) {
-        int value = decl.expr->evaluate();
-        context.Define(decl.id);
-        
+        if (variables.find(decl.id) != variables.end()) {
+            savedValues[decl.id] = variables[decl.id];
+        }
     }
     
+    // Evaluate and set the let-bound variables
+    for (const auto& decl : declarations) {
+        int value = decl.expr->evaluate();
+        variables[decl.id] = std::to_string(value);
+    }
     
-    return body->evaluate();
+    // Evaluate the body
+    int result = body->evaluate();
+    
+    // Restore original values or remove variables
+    for (const auto& decl : declarations) {
+        if (savedValues.find(decl.id) != savedValues.end()) {
+            variables[decl.id] = savedValues[decl.id];
+        } else {
+            variables.erase(decl.id);
+        }
+    }
+    
+    return result;
 }
 
 std::string LetExprNode::evaluateString() const {
@@ -36,23 +53,23 @@ std::string LetExprNode::evaluateString() const {
 }
 
 bool LetExprNode::validate(IContext* context) {
-    
-    for (const auto& decl : declarations) {
-        if (!decl.expr->validate(context)) {
-            errorMessage = "Error in declaration of '" + decl.id + "': " + decl.expr->getErrorMessage();
-            return false;
-        }
-    }
-    
-    
+    // Create child context for the let expression
     IContext* childContext = context->CreateChildContext();
     
-    
+    // Validate each declaration and add it to the context sequentially
     for (const auto& decl : declarations) {
+        // Validate the expression in the current context
+        if (!decl.expr->validate(childContext)) {
+            errorMessage = "Error in declaration of '" + decl.id + "': " + decl.expr->getErrorMessage();
+            delete childContext;
+            return false;
+        }
+        
+        // Add the variable to the context so it's available for subsequent declarations
         childContext->Define(decl.id);
     }
     
-    
+    // Validate the body with all variables defined
     bool result = body->validate(childContext);
     if (!result) {
         errorMessage = "Error in let expression body: " + body->getErrorMessage();
