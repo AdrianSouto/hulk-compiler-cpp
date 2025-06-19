@@ -48,20 +48,20 @@ static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::
 void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     std::vector<llvm::Type*> memberTypes;
     std::vector<std::string> memberNames;
-    
+
 
     std::function<void(const std::string&)> addInheritedAttributes = [&](const std::string& typeName) {
         if (typeName.empty()) return;
-        
+
         auto typeIt = types.find(typeName);
         if (typeIt != types.end()) {
             TypeDefNode* typeDef = typeIt->second;
-            
+
 
             if (!typeDef->parentTypeName.empty()) {
                 addInheritedAttributes(typeDef->parentTypeName);
             }
-            
+
 
             for (const auto& attr : typeDef->attributes) {
                 std::string attrTypeName = "Number";
@@ -74,12 +74,12 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             }
         }
     };
-    
+
 
     if (!node.parentTypeName.empty()) {
         addInheritedAttributes(node.parentTypeName);
     }
-    
+
 
     for (const auto& attr : node.attributes) {
         std::string typeName = "Number";
@@ -90,16 +90,16 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
         memberTypes.push_back(attrType);
         memberNames.push_back(attr.name);
     }
-    
+
 
     if (memberTypes.empty()) {
         memberTypes.push_back(llvm::Type::getInt8Ty(ctx));
     }
-    
+
 
     llvm::StructType* structType = llvm::StructType::create(ctx, memberTypes, node.typeName);
     structTypes[node.typeName] = structType;
-    
+
 
     std::cerr << "DEBUG: Type " << node.typeName << " has " << node.methods.size() << " methods" << std::endl;
     for (auto method : node.methods) {
@@ -107,7 +107,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             std::string originalName = defFunc->identifier;
             defFunc->identifier = node.typeName + "_" + originalName;
             std::cerr << "DEBUG: Processing method " << originalName << " as " << defFunc->identifier << std::endl;
-            
+
 
             bool hasSelfParam = false;
             for (const auto& param : defFunc->parameters) {
@@ -116,60 +116,50 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     break;
                 }
             }
-            
+
             if (!hasSelfParam) {
                 Parameter selfParam("self", nullptr);
                 defFunc->parameters.insert(defFunc->parameters.begin(), selfParam);
             }
-            
+
 
             std::string previousTypeName = currentTypeName;
             currentTypeName = node.typeName;
-            
+
 
             defFunc->accept(*this);
-            
+
 
             currentTypeName = previousTypeName;
             defFunc->identifier = originalName;
         }
     }
-    
+
 
     std::string constructorName = "new_" + node.typeName;
     std::vector<llvm::Type*> constructorParamTypes;
-    
 
-    // Create effective type arguments for constructor parameters
-    // If the type has explicit type arguments, use those
-    // If not, create implicit type arguments for inherited attributes
+
+    // If the type has no explicit type arguments but inherits from a parent,
+    // it should inherit the parent's type arguments
     std::vector<Parameter> effectiveTypeArguments = node.typeArguments;
-    
-    if (effectiveTypeArguments.empty() && !node.parentTypeName.empty()) {
-        // Create implicit type arguments for inherited attributes
-        std::function<void(const std::string&)> collectInheritedAttributes = [&](const std::string& typeName) {
-            if (typeName.empty()) return;
-            
-            auto typeIt = types.find(typeName);
-            if (typeIt != types.end()) {
-                TypeDefNode* typeDef = typeIt->second;
-                
-                // First collect from parent
-                if (!typeDef->parentTypeName.empty()) {
-                    collectInheritedAttributes(typeDef->parentTypeName);
-                }
-                
-                // Then add this type's attributes as implicit type arguments
-                for (const auto& attr : typeDef->attributes) {
-                    Parameter implicitParam(attr.name, attr.type);
-                    effectiveTypeArguments.push_back(implicitParam);
-                }
+
+    if (effectiveTypeArguments.empty() && !node.parentTypeName.empty() && node.parentArgs.empty()) {
+        // Inherit parent's type arguments when no explicit arguments are provided
+        // and no parent initialization expressions are given
+        // We need to traverse the inheritance chain to find the first ancestor with type arguments
+        std::string currentParent = node.parentTypeName;
+        while (!currentParent.empty() && effectiveTypeArguments.empty()) {
+            auto parentTypeIt = types.find(currentParent);
+            if (parentTypeIt != types.end()) {
+                effectiveTypeArguments = parentTypeIt->second->typeArguments;
+                currentParent = parentTypeIt->second->parentTypeName;
+            } else {
+                break;
             }
-        };
-        
-        collectInheritedAttributes(node.parentTypeName);
+        }
     }
-    
+
     // Build constructor parameter types
     for (const auto& param : effectiveTypeArguments) {
         std::string typeName = "Number";
@@ -179,25 +169,25 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
         llvm::Type* paramType = getLLVMTypeFromName(typeName, ctx);
         constructorParamTypes.push_back(paramType);
     }
-    
+
 
     llvm::FunctionType* constructorType = llvm::FunctionType::get(
         llvm::PointerType::get(structType, 0),
         constructorParamTypes,
         false
     );
-    
+
     llvm::Function* constructorFunc = llvm::Function::Create(
-        constructorType, 
-        llvm::Function::ExternalLinkage, 
-        constructorName, 
+        constructorType,
+        llvm::Function::ExternalLinkage,
+        constructorName,
         module
     );
-    
+
 
     llvm::BasicBlock* constructorBB = llvm::BasicBlock::Create(ctx, "entry", constructorFunc);
     llvm::IRBuilder<> constructorBuilder(constructorBB);
-    
+
 
     llvm::Value* structSize = llvm::ConstantExpr::getSizeOf(structType);
     llvm::Function* mallocFunc = module.getFunction("malloc");
@@ -209,39 +199,39 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
         );
         mallocFunc = llvm::Function::Create(mallocType, llvm::Function::ExternalLinkage, "malloc", module);
     }
-    
+
     llvm::Value* rawPtr = constructorBuilder.CreateCall(mallocFunc, {structSize});
     llvm::Value* typedPtr = constructorBuilder.CreateBitCast(rawPtr, llvm::PointerType::get(structType, 0));
-    
+
 
     auto argIt = constructorFunc->arg_begin();
     size_t memberIndex = 0;
-    
+
 
     std::vector<TypeDefNode*> inheritanceChain;
     std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
         if (typeName.empty()) return;
-        
+
         auto typeIt = types.find(typeName);
         if (typeIt != types.end()) {
             TypeDefNode* currentTypeDef = typeIt->second;
-            
+
 
             if (!currentTypeDef->parentTypeName.empty()) {
                 buildChain(currentTypeDef->parentTypeName);
             }
-            
+
 
             inheritanceChain.push_back(currentTypeDef);
         }
     };
-    
+
     buildChain(node.typeName);
-    
+
     // Create a map to store constructor parameters by name
     std::map<std::string, llvm::Value*> constructorParams;
     auto paramIt = constructorFunc->arg_begin();
-    
+
     // Collect constructor parameters using effective type arguments
     for (const auto& param : effectiveTypeArguments) {
         if (paramIt != constructorFunc->arg_end()) {
@@ -249,25 +239,25 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
             ++paramIt;
         }
     }
-    
+
     // Initialize members
     for (size_t chainIndex = 0; chainIndex < inheritanceChain.size(); ++chainIndex) {
         TypeDefNode* chainTypeDef = inheritanceChain[chainIndex];
-        
+
         // Check if this is a parent type and if the current node has parent initialization expressions
         bool useParentInitExpressions = false;
         std::vector<llvm::Value*> parentInitValues;
-        
+
         if (chainTypeDef->typeName == node.parentTypeName && !node.parentArgs.empty()) {
             useParentInitExpressions = true;
-            
+
             // Evaluate parent initialization expressions
             for (auto parentArg : node.parentArgs) {
                 // Save current insertion point
                 auto savedInsertPoint = builder.GetInsertBlock();
                 auto savedInsertPointIt = builder.GetInsertPoint();
                 builder.SetInsertPoint(constructorBB);
-                
+
                 // Create a temporary context with constructor parameters
                 std::map<std::string, llvm::AllocaInst*> tempVars;
                 for (const auto& param : constructorParams) {
@@ -276,15 +266,15 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     tempVars[param.first] = alloca;
                 }
                 localVarsStack.push_back(tempVars);
-                
+
                 // Evaluate the expression
                 parentArg->accept(*this);
                 llvm::Value* evalValue = lastValue;
-                
+
                 // Restore context
                 localVarsStack.pop_back();
                 builder.SetInsertPoint(savedInsertPoint, savedInsertPointIt);
-                
+
                 if (evalValue) {
                     parentInitValues.push_back(evalValue);
                 } else {
@@ -293,11 +283,11 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                 }
             }
         }
-        
+
         for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
             llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
             llvm::Value* initValue = nullptr;
-            
+
             // Check if we should use parent initialization expressions
             if (useParentInitExpressions && i < parentInitValues.size()) {
                 initValue = parentInitValues[i];
@@ -310,9 +300,9 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     initValue = paramIt->second;
                 }
             }
-            // For inherited types, check if attribute matches constructor parameter
+            // For inherited types without explicit parent args, check if attribute matches inherited parameter
             else if (chainTypeDef != &node && node.parentArgs.empty() && !node.parentTypeName.empty()) {
-                // Check if this inherited attribute name matches any of the effective type arguments
+                // Check if this attribute name matches any of the effective type arguments
                 for (const auto& param : effectiveTypeArguments) {
                     if (param.name == chainTypeDef->attributes[i].name) {
                         auto paramIt = constructorParams.find(param.name);
@@ -323,7 +313,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     }
                 }
             }
-            
+
             // If no init value yet, try the init expression
             if (!initValue && chainTypeDef->attributes[i].hasInitExpression()) {
                     // For now, just use constant values for initial expressions
@@ -332,7 +322,7 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     if (chainTypeDef->attributes[i].type) {
                         attrTypeName = chainTypeDef->attributes[i].type->toString();
                     }
-                    
+
                     // Check if it's a simple number literal
                     if (auto numNode = dynamic_cast<NumberNode*>(chainTypeDef->attributes[i].initExpression)) {
                         if (attrTypeName == "Number") {
@@ -357,14 +347,14 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                         }
                     }
             }
-            
+
             // If still no init value, use default
             if (!initValue) {
                 std::string attrTypeName = "Number";
                     if (chainTypeDef->attributes[i].type) {
                         attrTypeName = chainTypeDef->attributes[i].type->toString();
                     }
-                    
+
                     if (attrTypeName == "Number") {
                         initValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
                     } else if (attrTypeName == "Boolean") {
@@ -375,12 +365,12 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                         initValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
                     }
                 }
-            
+
             constructorBuilder.CreateStore(initValue, memberPtr);
             memberIndex++;
         }
     }
-    
+
     constructorBuilder.CreateRet(typedPtr);
     lastValue = nullptr;
 }
@@ -393,17 +383,17 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
         lastValue = nullptr;
         return;
     }
-    
+
 
     std::string constructorName = "new_" + node.typeName;
     llvm::Function* constructorFunc = module.getFunction(constructorName);
-    
+
     if (!constructorFunc) {
         std::cerr << "Error: Constructor not found for type '" << node.typeName << "'" << std::endl;
         lastValue = nullptr;
         return;
     }
-    
+
 
     std::vector<llvm::Value*> args;
     auto paramIt = constructorFunc->arg_begin();
@@ -412,7 +402,7 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
         if (lastValue && paramIt != constructorFunc->arg_end()) {
             llvm::Value* argVal = lastValue;
             llvm::Type* expectedType = paramIt->getType();
-            
+
 
             if (argVal->getType() != expectedType) {
                 if (argVal->getType()->isIntegerTy() && expectedType->isIntegerTy()) {
@@ -424,24 +414,24 @@ void LLVMCodegenVisitor::visit(TypeInstantiationNode& node) {
                     }
                 }
             }
-            
+
             args.push_back(argVal);
             ++paramIt;
         } else if (lastValue) {
             args.push_back(lastValue);
         }
     }
-    
+
 
     lastValue = builder.CreateCall(constructorFunc, args, "new_instance");
-    
+
 
     variableTypes["temp_instance"] = node.typeName;
 }
 
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
     llvm::Value* selfPtr = nullptr;
-    
+
 
     for (auto it = localVarsStack.rbegin(); it != localVarsStack.rend(); ++it) {
         auto selfIt = it->find("self");
@@ -450,47 +440,47 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
             break;
         }
     }
-    
+
     if (!selfPtr) {
         std::cerr << "Error: 'self' not found in current context" << std::endl;
         lastValue = nullptr;
         return;
     }
-    
+
     std::string selfTypeName = currentTypeName.empty() ? "Object" : currentTypeName;
-    
+
     std::cerr << "DEBUG: SelfMemberAccessNode - currentTypeName='" << currentTypeName << "', selfTypeName='" << selfTypeName << "'" << std::endl;
-    
+
     auto typeIt = types.find(selfTypeName);
     if (typeIt != types.end()) {
         TypeDefNode* typeDef = typeIt->second;
-        
+
         int attrIndex = -1;
         size_t currentIndex = 0;
-        
+
 
         std::vector<TypeDefNode*> inheritanceChain;
-        
+
 
         std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
             if (typeName.empty()) return;
-            
+
             auto typeIt = types.find(typeName);
             if (typeIt != types.end()) {
                 TypeDefNode* currentTypeDef = typeIt->second;
-                
+
 
                 if (!currentTypeDef->parentTypeName.empty()) {
                     buildChain(currentTypeDef->parentTypeName);
                 }
-                
+
 
                 inheritanceChain.push_back(currentTypeDef);
             }
         };
-        
+
         buildChain(selfTypeName);
-        
+
 
         for (TypeDefNode* chainTypeDef : inheritanceChain) {
             for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
@@ -502,18 +492,18 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
             }
             if (attrIndex >= 0) break;
         }
-        
+
         if (attrIndex >= 0) {
             std::cerr << "DEBUG: Found attribute '" << node.attributeName << "' at index " << attrIndex << std::endl;
-            
+
             auto structIt = structTypes.find(selfTypeName);
             if (structIt != structTypes.end()) {
                 llvm::StructType* structType = structIt->second;
-                
+
                 llvm::Value* memberPtr = builder.CreateStructGEP(structType, selfPtr, attrIndex, "attr_ptr");
                 llvm::Type* memberType = structType->getElementType(attrIndex);
                 lastValue = builder.CreateLoad(memberType, memberPtr, "attr_value");
-                
+
                 std::cerr << "DEBUG: Successfully loaded attribute '" << node.attributeName << "'" << std::endl;
             } else {
                 std::cerr << "Error: Could not find struct type for " << selfTypeName << std::endl;
@@ -538,21 +528,21 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
 
     node.object->accept(*this);
     llvm::Value* objPtr = lastValue;
-    
+
     if (!objPtr) {
         std::cerr << "Error: Invalid object in member access" << std::endl;
         lastValue = nullptr;
         return;
     }
-    
+
 
 
     std::string objTypeName = "Object";
-    
+
     auto typeIt = types.find(objTypeName);
     if (typeIt != types.end()) {
         TypeDefNode* typeDef = typeIt->second;
-        
+
 
         int memberIndex = -1;
         for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
@@ -561,7 +551,7 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
                 break;
             }
         }
-        
+
         if (memberIndex >= 0) {
 
 
@@ -581,16 +571,16 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
 
     node.object->accept(*this);
     llvm::Value* objPtr = lastValue;
-    
+
     if (!objPtr) {
         std::cerr << "Error: Invalid object in method call" << std::endl;
         lastValue = nullptr;
         return;
     }
-    
+
 
     std::string objTypeName = "";
-    
+
     if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
 
         auto typeIt = variableTypes.find(varNode->identifier);
@@ -602,7 +592,7 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         objTypeName = typeInstNode->typeName;
         std::cerr << "DEBUG: Direct type instantiation of '" << objTypeName << "'" << std::endl;
     }
-    
+
 
     std::vector<std::string> typesToTry;
     if (!objTypeName.empty()) {
@@ -629,24 +619,24 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
             typesToTry.push_back(typePair.first);
         }
     }
-    
+
     std::cerr << "DEBUG: Looking for method '" << node.methodName << "' in types: ";
     for (const auto& type : typesToTry) {
         std::cerr << type << " ";
     }
     std::cerr << std::endl;
-    
+
 
     std::vector<llvm::Value*> args;
     args.push_back(objPtr);
-    
+
     for (auto arg : node.arguments) {
         arg->accept(*this);
         if (lastValue) {
             args.push_back(lastValue);
         }
     }
-    
+
 
     llvm::Function* methodFunc = nullptr;
     for (const std::string& typeName : typesToTry) {
@@ -658,13 +648,16 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
             break;
         }
     }
-    
+
     if (!methodFunc) {
         std::cerr << "Error: Method '" << node.methodName << "' not found for object type" << std::endl;
         lastValue = nullptr;
         return;
     }
-    
+
 
     lastValue = builder.CreateCall(methodFunc, args, "method_result");
 }
+
+
+
