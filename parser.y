@@ -7,7 +7,7 @@
 // Declaraciones externas
 int yylex();
 void yyerror(const char* s);
-int line_count = 1;
+extern int yylineno;  // Variable del lexer que mantiene el número de línea actual
 Program program;  // Cambiado de Program* a Program para compatibilidad con main.cpp
 extern char* yytext;
 %}
@@ -879,5 +879,5 @@ parameter:
 %%
 
 void yyerror(const char* s) {
-    std::cerr << "Error sintáctico: " << s << " en línea " << line_count << ", cerca de '" << yytext << "'" << std::endl;
+    std::cerr << "Error sintáctico: " << s << " en línea " << yylineno << ", cerca de '" << yytext << "'" << std::endl;
 }

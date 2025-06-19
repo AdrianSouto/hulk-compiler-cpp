@@ -333,8 +333,15 @@ public:
         
         out << "std::string read_string() {\n";
         out << "    std::string result;\n";
+        out << "    int start_line = yylineno;\n";
+        out << "    int start_column = yycolumn;\n";
         out << "    advance(); // Skip opening quote\n";
         out << "    while (current_char() != '\\0' && current_char() != '\"') {\n";
+        out << "        if (current_char() == '\\n') {\n";
+        out << "            // Error: unterminated string literal\n";
+        out << "            printf(\"Error: String sin terminar en línea %d, columna %d\\n\", start_line, start_column);\n";
+        out << "            return result;\n";
+        out << "        }\n";
         out << "        if (current_char() == '\\\\' && peek_char() != '\\0') {\n";
         out << "            advance(); // Skip backslash\n";
         out << "            switch (current_char()) {\n";
@@ -350,7 +357,12 @@ public:
         out << "        }\n";
         out << "        advance();\n";
         out << "    }\n";
-        out << "    if (current_char() == '\"') advance(); // Skip closing quote\n";
+        out << "    if (current_char() == '\\0') {\n";
+        out << "        // Error: EOF in string\n";
+        out << "        printf(\"Error: Fin de archivo encontrado dentro de string en línea %d\\n\", start_line);\n";
+        out << "    } else if (current_char() == '\"') {\n";
+        out << "        advance(); // Skip closing quote\n";
+        out << "    }\n";
         out << "    return result;\n";
         out << "}\n\n";
         
