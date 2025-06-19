@@ -134,6 +134,14 @@ public:
         return conformsTo(other);
     }
     
+    // Helper methods for type checking
+    bool isNumber() const { return kind == TypeKind::NUMBER; }
+    bool isString() const { return kind == TypeKind::STRING; }
+    bool isBoolean() const { return kind == TypeKind::BOOLEAN; }
+    bool isObject() const { return kind == TypeKind::OBJECT; }
+    bool isVoid() const { return kind == TypeKind::VOID; }
+    bool isUserDefined() const { return kind == TypeKind::USER_DEFINED; }
+    
     
     static Type* findLowestCommonAncestor(Type* type1, Type* type2) {
         if (type1 == nullptr || type2 == nullptr) {

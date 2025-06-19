@@ -1,5 +1,6 @@
 #include "Expressions/BinaryOperatorNode.hpp"
 #include "Context/IContext.hpp"
+#include "Types/Type.hpp"
 #include <iostream>
 
 BinaryOperatorNode::BinaryOperatorNode(ExpressionNode* left, ExpressionNode* right)
@@ -28,6 +29,30 @@ bool BinaryOperatorNode::validate(IContext* context) {
         errorMessage = "Error in right operand of '" + std::string(1, getOperator()) + "': " +
                        right->getErrorMessage();
         return false;
+    }
+
+    // Type checking for arithmetic operators
+    char op = getOperator();
+    if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%' || op == '^') {
+        // Get types of both operands
+        Type* leftType = left->inferType(context);
+        Type* rightType = right->inferType(context);
+        
+        // Check if both operands are numbers
+        if (!leftType->isNumber() && !rightType->isNumber()) {
+            errorMessage = "Type error: operator '" + std::string(1, op) + 
+                          "' requires numeric operands, but got " + leftType->toString() + 
+                          " and " + rightType->toString();
+            return false;
+        } else if (!leftType->isNumber()) {
+            errorMessage = "Type error: left operand of '" + std::string(1, op) + 
+                          "' must be numeric, but got " + leftType->toString();
+            return false;
+        } else if (!rightType->isNumber()) {
+            errorMessage = "Type error: right operand of '" + std::string(1, op) + 
+                          "' must be numeric, but got " + rightType->toString();
+            return false;
+        }
     }
 
     return true;
