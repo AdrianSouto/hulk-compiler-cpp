@@ -140,24 +140,34 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
     std::vector<llvm::Type*> constructorParamTypes;
     
 
-    // If the type has no explicit type arguments but inherits from a parent,
-    // it should inherit the parent's type arguments
+    // Create effective type arguments for constructor parameters
+    // If the type has explicit type arguments, use those
+    // If not, create implicit type arguments for inherited attributes
     std::vector<Parameter> effectiveTypeArguments = node.typeArguments;
     
-    if (effectiveTypeArguments.empty() && !node.parentTypeName.empty() && node.parentArgs.empty()) {
-        // Inherit parent's type arguments when no explicit arguments are provided
-        // and no parent initialization expressions are given
-        // We need to traverse the inheritance chain to find the first ancestor with type arguments
-        std::string currentParent = node.parentTypeName;
-        while (!currentParent.empty() && effectiveTypeArguments.empty()) {
-            auto parentTypeIt = types.find(currentParent);
-            if (parentTypeIt != types.end()) {
-                effectiveTypeArguments = parentTypeIt->second->typeArguments;
-                currentParent = parentTypeIt->second->parentTypeName;
-            } else {
-                break;
+    if (effectiveTypeArguments.empty() && !node.parentTypeName.empty()) {
+        // Create implicit type arguments for inherited attributes
+        std::function<void(const std::string&)> collectInheritedAttributes = [&](const std::string& typeName) {
+            if (typeName.empty()) return;
+            
+            auto typeIt = types.find(typeName);
+            if (typeIt != types.end()) {
+                TypeDefNode* typeDef = typeIt->second;
+                
+                // First collect from parent
+                if (!typeDef->parentTypeName.empty()) {
+                    collectInheritedAttributes(typeDef->parentTypeName);
+                }
+                
+                // Then add this type's attributes as implicit type arguments
+                for (const auto& attr : typeDef->attributes) {
+                    Parameter implicitParam(attr.name, attr.type);
+                    effectiveTypeArguments.push_back(implicitParam);
+                }
             }
-        }
+        };
+        
+        collectInheritedAttributes(node.parentTypeName);
     }
     
     // Build constructor parameter types
@@ -300,9 +310,9 @@ void LLVMCodegenVisitor::visit(TypeDefNode& node) {
                     initValue = paramIt->second;
                 }
             }
-            // For inherited types without explicit parent args, check if attribute matches inherited parameter
+            // For inherited types, check if attribute matches constructor parameter
             else if (chainTypeDef != &node && node.parentArgs.empty() && !node.parentTypeName.empty()) {
-                // Check if this attribute name matches any of the effective type arguments
+                // Check if this inherited attribute name matches any of the effective type arguments
                 for (const auto& param : effectiveTypeArguments) {
                     if (param.name == chainTypeDef->attributes[i].name) {
                         auto paramIt = constructorParams.find(param.name);
@@ -658,6 +668,3 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
 
     lastValue = builder.CreateCall(methodFunc, args, "method_result");
 }
-
-
-
