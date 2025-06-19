@@ -2,6 +2,7 @@
 #define AS_NODE_HPP
 
 #include "AST/ExpressionNode.hpp"
+#include "Types/Type.hpp"
 #include <string>
 
 class AsNode : public ExpressionNode {
@@ -16,6 +17,7 @@ public:
     std::string evaluateString() const override;
     void print(int indent = 0) const override;
     bool validate(IContext* context) override;
+    Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;
     
     ~AsNode();

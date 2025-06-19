@@ -5,6 +5,7 @@
 #include "Expressions/SelfMemberAssignmentNode.hpp"
 #include "Expressions/BlockExprNode.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
+#include "Expressions/AsNode.hpp"
 #include "Statements/TypeDefNode.hpp"
 #include "Globals.hpp"
 
@@ -31,9 +32,15 @@ void LLVMCodegenVisitor::visit(LetExprNode& node) {
         decl.expr->accept(*this);
         llvm::Value* val = lastValue;
 
-
+        // Track variable types
         if (auto typeInst = dynamic_cast<TypeInstantiationNode*>(decl.expr)) {
             variableTypes[decl.id] = typeInst->typeName;
+        } else if (auto asNode = dynamic_cast<AsNode*>(decl.expr)) {
+            // Track the type after downcasting
+            variableTypes[decl.id] = asNode->typeName;
+        } else if (decl.type && decl.type->getTypeName() != "Unknown") {
+            // Track the declared type
+            variableTypes[decl.id] = decl.type->getTypeName();
         }
 
         llvm::Function* func = builder.GetInsertBlock()->getParent();

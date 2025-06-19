@@ -535,7 +535,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
-
+    // Evaluate the object expression
     node.object->accept(*this);
     llvm::Value* objPtr = lastValue;
     
@@ -545,34 +545,90 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
         return;
     }
     
-
-
-    std::string objTypeName = "Object";
+    // Determine the object's type
+    std::string objTypeName = "";
     
+    if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
+        // Look up the variable's type
+        auto typeIt = variableTypes.find(varNode->identifier);
+        if (typeIt != variableTypes.end()) {
+            objTypeName = typeIt->second;
+        }
+    } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
+        objTypeName = typeInstNode->typeName;
+    } else if (auto asNode = dynamic_cast<AsNode*>(node.object)) {
+        objTypeName = asNode->typeName;
+    }
+    
+    if (objTypeName.empty()) {
+        std::cerr << "Error: Could not determine type for member access" << std::endl;
+        lastValue = nullptr;
+        return;
+    }
+    
+    // Find the type definition
     auto typeIt = types.find(objTypeName);
-    if (typeIt != types.end()) {
-        TypeDefNode* typeDef = typeIt->second;
+    if (typeIt == types.end()) {
+        std::cerr << "Error: Type definition not found for '" << objTypeName << "'" << std::endl;
+        lastValue = nullptr;
+        return;
+    }
+    
+    TypeDefNode* typeDef = typeIt->second;
+    
+    // Find the member index considering inheritance
+    int memberIndex = -1;
+    size_t currentIndex = 0;
+    
+    // Build inheritance chain
+    std::vector<TypeDefNode*> inheritanceChain;
+    std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
+        if (typeName.empty()) return;
         
-
-        int memberIndex = -1;
-        for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
-            if (typeDef->attributes[i].name == node.memberName) {
-                memberIndex = i;
+        auto typeIt = types.find(typeName);
+        if (typeIt != types.end()) {
+            TypeDefNode* currentTypeDef = typeIt->second;
+            
+            // First add parent types
+            if (!currentTypeDef->parentTypeName.empty()) {
+                buildChain(currentTypeDef->parentTypeName);
+            }
+            
+            // Then add this type
+            inheritanceChain.push_back(currentTypeDef);
+        }
+    };
+    
+    buildChain(objTypeName);
+    
+    // Search for the member in the inheritance chain
+    for (TypeDefNode* chainTypeDef : inheritanceChain) {
+        for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
+            if (chainTypeDef->attributes[i].name == node.memberName) {
+                memberIndex = currentIndex;
                 break;
             }
+            currentIndex++;
         }
-        
-        if (memberIndex >= 0) {
-
-
-            std::cerr << "Warning: MemberAccessNode implementation is incomplete" << std::endl;
-            lastValue = llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+        if (memberIndex >= 0) break;
+    }
+    
+    if (memberIndex >= 0) {
+        // Get the struct type
+        auto structIt = structTypes.find(objTypeName);
+        if (structIt != structTypes.end()) {
+            llvm::StructType* structType = structIt->second;
+            
+            // Create GEP to access the member
+            llvm::Value* memberPtr = builder.CreateStructGEP(structType, objPtr, memberIndex, "member_ptr");
+            llvm::Type* memberType = structType->getElementType(memberIndex);
+            lastValue = builder.CreateLoad(memberType, memberPtr, "member_value");
         } else {
-            std::cerr << "Error: Member '" << node.memberName << "' not found" << std::endl;
+            std::cerr << "Error: Could not find struct type for " << objTypeName << std::endl;
             lastValue = nullptr;
         }
     } else {
-        std::cerr << "Error: Type definition not found for object" << std::endl;
+        std::cerr << "Error: Member '" << node.memberName << "' not found in type '" << objTypeName << "'" << std::endl;
         lastValue = nullptr;
     }
 }

@@ -80,6 +80,30 @@ bool AsNode::validate(IContext* context) {
     return true;
 }
 
+Type* AsNode::inferType(IContext* context) const {
+    // The result type of an 'as' cast is the target type
+    Type* targetType = nullptr;
+    
+    // Try to get the type from the global type registry
+    if (typeName == "Number") {
+        targetType = Type::getNumberType();
+    } else if (typeName == "String") {
+        targetType = Type::getStringType();
+    } else if (typeName == "Boolean") {
+        targetType = Type::getBooleanType();
+    } else if (typeName == "Object") {
+        targetType = Type::getObjectType();
+    } else {
+        // User-defined type
+        targetType = getTypeByName(typeName);
+        if (!targetType) {
+            targetType = Type::getUnknownType();
+        }
+    }
+    
+    return targetType;
+}
+
 void AsNode::accept(LLVMCodegenVisitor& visitor) {
     visitor.visit(*this);
 }
