@@ -40,7 +40,7 @@
 "<=" { printf("<LESSEQ>\n"); return LESSEQ; }
 ">=" { printf("<GREATEREQ>\n"); return GREATEREQ; }
 "&&" { printf("<AND>\n"); return AND; }
-"||" { printf("<OR>\n"); return OR; }
+"|" { printf("<OR>\n"); return OR; }
 "@@" { printf("<CONCAT_SPACE>\n"); return CONCAT_SPACE; }
 "=>" { printf("<ARROW>\n"); return ARROW; }
 "**" { printf("<POWER>\n"); return POWER; }
