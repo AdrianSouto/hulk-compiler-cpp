@@ -11,7 +11,8 @@
 #include <llvm/Support/FileSystem.h> 
 #include <Visitors/LLVMCodegenVisitor.hpp>
 
-extern FILE* yyin;
+
+extern void set_input_from_file(FILE* file);
 extern int yyparse();
 extern Program program;
 
@@ -24,18 +25,21 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "DEBUG: Opening file: " << filename << std::endl;
-    yyin = fopen(filename, "r");
-    if (!yyin) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
         std::cerr << "Error opening file: " << filename << std::endl;
         return 1;
     }
+    
+
+    set_input_from_file(file);
     
     std::cout << "DEBUG: Starting parsing..." << std::endl;
     int parseResult = yyparse();
     std::cout << "DEBUG: Parse result: " << parseResult << std::endl;
     if (parseResult != 0) {
         std::cerr << "Error de análisis sintáctico. No se pudo procesar el programa." << std::endl;
-        fclose(yyin);
+        fclose(file);
         return 1;
     }
 
@@ -66,30 +70,30 @@ int main(int argc, char* argv[]) {
                 llvm::raw_fd_ostream dest("output.ll", EC, llvm::sys::fs::OF_None);
                 if (EC) {
                     llvm::errs() << "Could not open file: " << EC.message();
-                    fclose(yyin);
+                    fclose(file);
                     return 1;
                 }
                 module.print(dest, nullptr);
                 std::cout << "LLVM IR generated to output.ll" << std::endl;
 
                 
-                fclose(yyin);
+                fclose(file);
                 return 0;
                 
             } catch (const std::exception& e) {
                 std::cerr << "Error durante la generación de código LLVM: " << e.what() << std::endl;
-                fclose(yyin);
+                fclose(file);
                 return 1;
             }
         } else {
             std::cerr << "Error de validación del programa: " << program.getErrorMessage() << std::endl;
-            fclose(yyin); 
+            fclose(file); 
             return 1;
         }
     } else {
         std::cerr << "No hay declaraciones en el programa. El archivo podría estar vacío o contener errores de sintaxis." << std::endl;
     }
 
-    fclose(yyin);
+    fclose(file);
     return 0;
 }
