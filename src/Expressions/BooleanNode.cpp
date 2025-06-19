@@ -1,5 +1,6 @@
 #include "Expressions/BooleanNode.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
+#include "Types/Type.hpp"
 #include <iostream>
 
 BooleanNode::BooleanNode(bool val) : value(val) {}
@@ -21,6 +22,11 @@ void BooleanNode::print(int indent) const {
 
 bool BooleanNode::validate(IContext* context) { 
     return true; 
+}
+
+Type* BooleanNode::inferType(IContext* context) const {
+    (void)context;
+    return Type::getBooleanType();
 }
 
 void BooleanNode::accept(LLVMCodegenVisitor& visitor) {

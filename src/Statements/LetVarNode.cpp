@@ -69,26 +69,17 @@ bool LetVarNode::validate(IContext* context) {
     }
 
 
-    if (declaredType != Type::getUnknownType()) {
-
-        Type* inferredType = Type::getUnknownType();
-
+    if (declaredType && declaredType != Type::getUnknownType()) {
+        // Use inferType for comprehensive type checking
+        Type* inferredType = expr->inferType(context);
         
-        if (dynamic_cast<NumberNode*>(expr)) {
-            inferredType = Type::getNumberType();
-        } else if (dynamic_cast<StringLiteralNode*>(expr)) {
-            inferredType = Type::getStringType();
-        } else if (dynamic_cast<BooleanNode*>(expr)) {
-            inferredType = Type::getBooleanType();
-        } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(expr)) {
-            
-            inferredType = getTypeByName(typeInstNode->typeName);
-        }
-
-        if (!inferredType->isCompatibleWith(declaredType)) {
-            errorMessage = "Type error in variable '" + identifier + "': expected " +
-                           declaredType->toString() + " but got " + inferredType->toString();
-            return false;
+        if (inferredType && inferredType != Type::getUnknownType()) {
+            // Check if the inferred type matches the declared type
+            if (inferredType->getTypeName() != declaredType->getTypeName()) {
+                errorMessage = "Type error in variable '" + identifier + "': expected " +
+                               declaredType->getTypeName() + " but got " + inferredType->getTypeName();
+                return false;
+            }
         }
     }
 

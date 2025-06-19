@@ -2,6 +2,7 @@
 #include "Context/Context.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp" 
 #include "Globals.hpp"
+#include "Types/Type.hpp"
 #include <stdexcept>
 #include <iostream>
 #include <map>
@@ -65,6 +66,20 @@ bool LetExprNode::validate(IContext* context) {
             errors.push_back("Variable '" + decl.id + "': " + decl.expr->getErrorMessage());
             hasErrors = true;
             // Still add the variable to context to continue checking other errors
+        }
+        
+        // Check type compatibility if type annotation is provided
+        if (decl.type && decl.type->getTypeName() != "Unknown") {
+            Type* exprType = decl.expr->inferType(childContext);
+            if (exprType && exprType->getTypeName() != "Unknown") {
+                // Check if the expression type matches the declared type
+                if (exprType->getTypeName() != decl.type->getTypeName()) {
+                    errors.push_back("Type mismatch for variable '" + decl.id + 
+                                   "': expected " + decl.type->getTypeName() + 
+                                   " but got " + exprType->getTypeName());
+                    hasErrors = true;
+                }
+            }
         }
         
         // Add the variable to the context so it's available for subsequent declarations
