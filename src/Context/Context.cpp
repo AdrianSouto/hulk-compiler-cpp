@@ -14,8 +14,7 @@ Context::Context() : parent(nullptr) {
     functionSignatures.emplace("cos", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("sqrt", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("rand", FunctionSignature({}, Type::getNumberType()));
-
-    variables.insert("PI");
+    variableTypes["PI"] = Type::getNumberType();
 }
 
 Context::Context(IContext* parent) : parent(parent) {}
@@ -105,4 +104,34 @@ bool Context::IsInMethod() {
 bool Context::HasParentMethod() {
 
     return false;
+}
+
+bool Context::DefineVariable(const std::string& variable, Type* type) {
+    // Si la variable ya existe en este contexto, no la redefinimos
+    if (variables.find(variable) != variables.end()) {
+        return false;
+    }
+    
+    variables.insert(variable);
+    variableTypes[variable] = type;
+    return true;
+}
+
+Type* Context::GetVariableType(const std::string& variable) {
+    // Buscar en el contexto actual
+    auto it = variableTypes.find(variable);
+    if (it != variableTypes.end()) {
+        return it->second;
+    }
+    
+    // Buscar en el contexto padre
+    if (parent != nullptr) {
+        Context* parentContext = dynamic_cast<Context*>(parent);
+        if (parentContext) {
+            return parentContext->GetVariableType(variable);
+        }
+    }
+    
+    // Si no se encuentra, retornar tipo desconocido
+    return nullptr;
 }

@@ -21,6 +21,7 @@ class Context : public IContext {
 private:
     IContext* parent;
     std::unordered_set<std::string> variables;
+    std::unordered_map<std::string, Type*> variableTypes;  // Nuevo: almacena tipos de variables
     std::unordered_map<std::string, std::vector<std::string>> functions;
     std::unordered_map<std::string, FunctionSignature> functionSignatures;
 
@@ -32,6 +33,10 @@ public:
     bool IsDefined(const std::string& function, int args) override;
     bool Define(const std::string& variable) override;
     bool Define(const std::string& function, const std::vector<std::string>& args) override;
+    
+    // Nuevos métodos para manejar tipos de variables
+    bool DefineVariable(const std::string& variable, Type* type);
+    Type* GetVariableType(const std::string& variable);
     
 
     bool DefineFunction(const std::string& function, const std::vector<Parameter>& params, Type* returnType);

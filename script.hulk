@@ -1,3 +1,2 @@
-print("hello");
-prints("hello");
-print("hello");
+function sum(x : Number) : Number => x + 10;
+let x: String = "5" in print(sum(x));

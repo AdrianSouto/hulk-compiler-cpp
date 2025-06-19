@@ -1,6 +1,7 @@
 #include "Statements/LetVarNode.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Context/IContext.hpp"
+#include "Context/Context.hpp"
 #include "Expressions/NumberNode.hpp"
 #include "Expressions/StringLiteralNode.hpp"
 #include "Expressions/BooleanNode.hpp"
@@ -85,9 +86,20 @@ bool LetVarNode::validate(IContext* context) {
 
     
     IContext* childContext = context->CreateChildContext();
+    Context* childCtx = dynamic_cast<Context*>(childContext);
     
+    // Infer the type of the expression
+    Type* inferredType = expr->inferType(context);
     
-    childContext->Define(identifier);
+    // Add the variable to the context with its type
+    if (childCtx) {
+        // Use the declared type if provided, otherwise use the inferred type
+        Type* varType = declaredType ? declaredType : inferredType;
+        childCtx->DefineVariable(identifier, varType);
+    } else {
+        // Fallback to the old method if cast fails
+        childContext->Define(identifier);
+    }
 
     if (body && !body->validate(childContext)) {
         errorMessage = "Error in 'let' statement body: " + body->getErrorMessage();

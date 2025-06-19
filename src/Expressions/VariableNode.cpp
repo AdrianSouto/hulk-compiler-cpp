@@ -1,5 +1,6 @@
 #include "Expressions/VariableNode.hpp"
 #include "Context/IContext.hpp"
+#include "Context/Context.hpp"
 #include "Types/Type.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Globals.hpp"
@@ -53,9 +54,16 @@ bool VariableNode::validate(IContext* context) {
 }
 
 Type* VariableNode::inferType(IContext* context) const {
-
-
-    (void)context;
+    // Intentar obtener el tipo del contexto
+    Context* ctx = dynamic_cast<Context*>(context);
+    if (ctx) {
+        Type* varType = ctx->GetVariableType(identifier);
+        if (varType) {
+            return varType;
+        }
+    }
+    
+    // Si no se encuentra el tipo, asumir Number por defecto
     return Type::getNumberType();
 }
 

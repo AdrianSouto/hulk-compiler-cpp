@@ -56,6 +56,7 @@ std::string LetExprNode::evaluateString() const {
 bool LetExprNode::validate(IContext* context) {
     // Create child context for the let expression
     IContext* childContext = context->CreateChildContext();
+    Context* childCtx = dynamic_cast<Context*>(childContext);
     std::vector<std::string> errors;
     bool hasErrors = false;
     
@@ -68,9 +69,11 @@ bool LetExprNode::validate(IContext* context) {
             // Still add the variable to context to continue checking other errors
         }
         
+        // Infer the type of the expression
+        Type* exprType = decl.expr->inferType(childContext);
+        
         // Check type compatibility if type annotation is provided
         if (decl.type && decl.type->getTypeName() != "Unknown") {
-            Type* exprType = decl.expr->inferType(childContext);
             if (exprType && exprType->getTypeName() != "Unknown") {
                 // Check if the expression type matches the declared type
                 if (exprType->getTypeName() != decl.type->getTypeName()) {
@@ -82,8 +85,15 @@ bool LetExprNode::validate(IContext* context) {
             }
         }
         
-        // Add the variable to the context so it's available for subsequent declarations
-        childContext->Define(decl.id);
+        // Add the variable to the context with its type
+        if (childCtx) {
+            // Use the declared type if provided, otherwise use the inferred type
+            Type* varType = decl.type ? decl.type : exprType;
+            childCtx->DefineVariable(decl.id, varType);
+        } else {
+            // Fallback to the old method if cast fails
+            childContext->Define(decl.id);
+        }
     }
     
     // Validate the body with all variables defined
