@@ -23,7 +23,11 @@ void ExpressionStatementNode::print(int indent) const {
 
 bool ExpressionStatementNode::validate(IContext* context) {
     if (expression) {
-        return expression->validate(context);
+        bool result = expression->validate(context);
+        if (!result) {
+            errorMessage = expression->getErrorMessage();
+        }
+        return result;
     }
     return true;
 }

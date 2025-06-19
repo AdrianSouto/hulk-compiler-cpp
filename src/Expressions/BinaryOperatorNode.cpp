@@ -11,13 +11,20 @@ BinaryOperatorNode::~BinaryOperatorNode() {
 }
 
 bool BinaryOperatorNode::validate(IContext* context) {
-    if (!left->validate(context)) {
+    bool leftValid = left->validate(context);
+    bool rightValid = right->validate(context);
+    
+    if (!leftValid && !rightValid) {
+        // Both operands have errors
+        errorMessage = "Multiple errors in '" + std::string(1, getOperator()) + "' expression:\n" +
+                       "  - Left operand: " + left->getErrorMessage() + "\n" +
+                       "  - Right operand: " + right->getErrorMessage();
+        return false;
+    } else if (!leftValid) {
         errorMessage = "Error in left operand of '" + std::string(1, getOperator()) + "': " +
                        left->getErrorMessage();
         return false;
-    }
-
-    if (!right->validate(context)) {
+    } else if (!rightValid) {
         errorMessage = "Error in right operand of '" + std::string(1, getOperator()) + "': " +
                        right->getErrorMessage();
         return false;

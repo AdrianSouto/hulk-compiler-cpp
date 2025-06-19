@@ -55,14 +55,16 @@ std::string LetExprNode::evaluateString() const {
 bool LetExprNode::validate(IContext* context) {
     // Create child context for the let expression
     IContext* childContext = context->CreateChildContext();
+    std::vector<std::string> errors;
+    bool hasErrors = false;
     
     // Validate each declaration and add it to the context sequentially
     for (const auto& decl : declarations) {
         // Validate the expression in the current context
         if (!decl.expr->validate(childContext)) {
-            errorMessage = "Error in declaration of '" + decl.id + "': " + decl.expr->getErrorMessage();
-            delete childContext;
-            return false;
+            errors.push_back("Variable '" + decl.id + "': " + decl.expr->getErrorMessage());
+            hasErrors = true;
+            // Still add the variable to context to continue checking other errors
         }
         
         // Add the variable to the context so it's available for subsequent declarations
@@ -70,13 +72,22 @@ bool LetExprNode::validate(IContext* context) {
     }
     
     // Validate the body with all variables defined
-    bool result = body->validate(childContext);
-    if (!result) {
-        errorMessage = "Error in let expression body: " + body->getErrorMessage();
+    bool bodyValid = body->validate(childContext);
+    if (!bodyValid) {
+        errors.push_back("In body: " + body->getErrorMessage());
+        hasErrors = true;
+    }
+    
+    // Construct error message
+    if (hasErrors) {
+        errorMessage = "Errors in let expression:";
+        for (const auto& error : errors) {
+            errorMessage += "\n  - " + error;
+        }
     }
     
     delete childContext;
-    return result;
+    return !hasErrors;
 }
 
 void LetExprNode::accept(LLVMCodegenVisitor& visitor) {
