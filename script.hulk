@@ -1,11 +1,10 @@
-type Person(firstname: String, lastnamexx: String) {
-    firstname: String = firstname;
-    lastname: String = lastname;
-    name() : String => self.firstname @ " " @ self.lastname;
+type A {
 }
 
-type Knight inherits Person {
-    name() : String => "Sir " @ base();
+type B inherits A {
 }
 
-let p = new Knight("Pep", 123) in print(p.name());
+type C inherits A {
+}
+
+let x : A = new B() in print("Ok");
