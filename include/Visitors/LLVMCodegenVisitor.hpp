@@ -126,6 +126,10 @@ public:
     void visit(IsNode& node);
     void visit(AsNode& node);
     void visit(PrintExpressionNode& node);
+
+    // Helper functions for runtime type system
+    llvm::Type* getLLVMTypeFromName(const std::string& typeName);
+    void createSimpleConstructor(TypeDefNode& node, llvm::StructType* structType, llvm::GlobalVariable* typeInfoGlobal);
 };
 
 #endif

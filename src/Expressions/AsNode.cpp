@@ -80,6 +80,17 @@ bool AsNode::validate(IContext* context) {
     return true;
 }
 
+Type* AsNode::inferType(IContext* context) const {
+    // The result type of an 'as' expression is the target type
+    Type* targetType = getTypeByName(typeName);
+    if (targetType) {
+        return targetType;
+    }
+    
+    // If target type is not found, return the default
+    return Type::getNumberType();
+}
+
 void AsNode::accept(LLVMCodegenVisitor& visitor) {
     visitor.visit(*this);
 }

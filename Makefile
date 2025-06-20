@@ -63,6 +63,7 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Statements/PrintStatementNode.cpp \
               src/Statements/TypeDefNode.cpp \
               src/Expressions/PrintExpressionNode.cpp \
+              src/RuntimeTypeInfo.cpp \
               src/Visitors/LLVMCodegenVisitor_Arithmetic.cpp \
               src/Visitors/LLVMCodegenVisitor_Comparison.cpp \
               src/Visitors/LLVMCodegenVisitor_Control.cpp \
@@ -71,8 +72,6 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Functions.cpp \
               src/Visitors/LLVMCodegenVisitor_Literals.cpp \
               src/Visitors/LLVMCodegenVisitor_Logical.cpp \
-              src/Visitors/LLVMCodegenVisitor_IsNode.cpp \
-              src/Visitors/LLVMCodegenVisitor_AsNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Statements.cpp \
               src/Visitors/LLVMCodegenVisitor_String.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
@@ -104,14 +103,14 @@ all: compile
 
 
 compile: $(TARGET)
-	@echo "Compilation completed with native lexer. Artifacts stored in hulk/"
+	@echo "Compilation completed with enhanced runtime type system. Artifacts stored in hulk/"
 
 
 $(TARGET): $(HULK_DIR) $(LEXER_SOURCE) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT) $(LLVM_LDFLAGS)
 	@echo "Copying additional artifacts to hulk/"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
-	@echo "Hulk compiler with native lexer built successfully in hulk/"
+	@echo "Hulk compiler with enhanced runtime type system built successfully in hulk/"
 
 
 $(HULK_DIR):
@@ -160,7 +159,7 @@ build/%.o: src/%.cpp | $(BUILD_DIR)
 
 
 execute: force-regenerate $(TARGET)
-	@echo "--- Running Hulk Compiler Workflow with Native Lexer ---"
+	@echo "--- Running Enhanced Hulk Compiler with Runtime Type System ---"
 	@cd hulk && \
 	    echo "Step 1: Generating LLVM IR (./hulk_compiler.exe $(INPUT_FILE) -> output.ll)..." && \
 	    ./hulk_compiler.exe $(INPUT_FILE) && \
@@ -170,7 +169,7 @@ execute: force-regenerate $(TARGET)
 	    $(CXX) output.s -o output_exec -lm && \
 	    echo "Step 4: Executing the generated program (./output_exec)..." && \
 	    ./output_exec
-	@echo "--- Hulk Compiler Workflow with Native Lexer Completed ---"
+	@echo "--- Enhanced Hulk Compiler Workflow Completed ---"
 
 
 force-regenerate:
@@ -191,10 +190,9 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  compile  - Compile the Hulk compiler with native lexer and generate hulk/ directory"
+	@echo "  compile  - Compile the Enhanced Hulk compiler with runtime type system"
 	@echo "  execute  - Execute the compiled Hulk program (depends on compile)"
 	@echo "  clean    - Remove all build artifacts"
 	@echo "  help     - Show this help message"
 	@echo ""
-	@echo "This Makefile uses a native C++ lexer instead of Flex."
-
+	@echo "This Enhanced Makefile includes the runtime type system for proper downcasting."

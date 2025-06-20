@@ -3,6 +3,7 @@
 #include "Statements/TypeDefNode.hpp"
 #include "Types/Type.hpp"
 
+#include <llvm/IR/DerivedTypes.h>
 
 std::map<std::string, std::string> variables;
 std::map<std::string, std::pair<std::vector<std::string>, ExpressionNode*>> functions;
@@ -10,6 +11,8 @@ std::map<std::string, TypeDefNode*> types;
 std::map<std::string, Type*> typeRegistry;
 std::map<std::string, std::string> variableTypes;
 
+// Global map for LLVM struct types
+std::map<std::string, llvm::StructType*> structTypes;
 
 static bool typeRegistryInitialized = false;
 
@@ -67,5 +70,4 @@ Type* createUserDefinedType(const std::string& typeName, TypeDefNode* typeDef, c
     
     return newType;
 }
-
 

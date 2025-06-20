@@ -43,7 +43,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
         if (param.type) {
             typeName = param.type->toString();
         }
-        llvm::Type* paramType = getLLVMTypeFromName(typeName, ctx);
+        llvm::Type* paramType = ::getLLVMTypeFromName(typeName, ctx);
         
 
         if (param.name == "self" && !currentTypeName.empty()) {
@@ -65,7 +65,7 @@ void LLVMCodegenVisitor::visit(DefFuncNode& node) {
 
     llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
     if (node.returnType) {
-        returnType = getLLVMTypeFromName(node.returnType->toString(), ctx);
+        returnType = ::getLLVMTypeFromName(node.returnType->toString(), ctx);
     } else {
         if (!node.isBlockBody && node.expr) {
             if (dynamic_cast<ConcatenationNode*>(node.expr)) {

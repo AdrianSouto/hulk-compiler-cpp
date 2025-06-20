@@ -5,6 +5,8 @@
 #include "AST/ASTNode.hpp"
 #include <vector>
 
+class Type;
+
 class ConditionalNode : public ExpressionNode {
 public:
     struct Branch {
@@ -25,8 +27,12 @@ public:
     }
     void print(int indent = 0) const override;
     bool validate(IContext* context) override;
+    Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;
     ~ConditionalNode();
+
+private:
+    Type* findCommonBaseType(Type* type1, Type* type2) const;
 };
 
 #endif
