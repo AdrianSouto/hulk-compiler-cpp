@@ -217,7 +217,7 @@ void LLVMCodegenVisitor::createSimpleConstructor(TypeDefNode& node,
         }
     }
 
-    // Inicializar miembros (lógica similar a la anterior pero empezando desde índice 1)
+    // Inicializar miembros (lógica mejorada para manejar argumentos de constructor padre)
     size_t memberIndex = 1; // Saltar el campo TypeInfo*
     
     // Construir cadena de herencia
@@ -239,6 +239,48 @@ void LLVMCodegenVisitor::createSimpleConstructor(TypeDefNode& node,
 
     buildChain(node.typeName);
 
+    // Evaluar argumentos del constructor padre si existen
+    std::map<std::string, llvm::Value*> parentArgValues;
+    if (!node.parentArgs.empty()) {
+        // Crear un nuevo scope para las variables del constructor
+        localVarsStack.push_back(std::map<std::string, llvm::AllocaInst*>());
+        
+        // Mapear parámetros del constructor actual para usar en las expresiones padre
+        auto paramIt = constructorFunc->arg_begin();
+        for (const auto& param : effectiveTypeArguments) {
+            if (paramIt != constructorFunc->arg_end()) {
+                // Crear una variable temporal para el parámetro
+                llvm::AllocaInst* paramAlloca = createEntryBlockAlloca(constructorFunc, paramIt->getType(), param.name);
+                constructorBuilder.CreateStore(&*paramIt, paramAlloca);
+                
+                // Guardar en el stack de variables locales
+                localVarsStack.back()[param.name] = paramAlloca;
+                ++paramIt;
+            }
+        }
+        
+        // Evaluar cada argumento del constructor padre
+        for (size_t i = 0; i < node.parentArgs.size() && i < inheritanceChain[0]->attributes.size(); ++i) {
+            // Cambiar temporalmente el builder context
+            llvm::BasicBlock* originalBB = builder.GetInsertBlock();
+            builder.SetInsertPoint(constructorBB);
+            
+            // Evaluar la expresión
+            node.parentArgs[i]->accept(*this);
+            if (lastValue) {
+                parentArgValues[inheritanceChain[0]->attributes[i].name] = lastValue;
+            }
+            
+            // Restaurar el builder context
+            if (originalBB) {
+                builder.SetInsertPoint(originalBB);
+            }
+        }
+        
+        // Limpiar el scope de variables
+        localVarsStack.pop_back();
+    }
+
     // Inicializar miembros
     for (size_t chainIndex = 0; chainIndex < inheritanceChain.size(); ++chainIndex) {
         TypeDefNode* chainTypeDef = inheritanceChain[chainIndex];
@@ -247,8 +289,16 @@ void LLVMCodegenVisitor::createSimpleConstructor(TypeDefNode& node,
             llvm::Value* memberPtr = constructorBuilder.CreateStructGEP(structType, typedPtr, memberIndex);
             llvm::Value* initValue = nullptr;
 
-            // Buscar valor de inicialización
-            if (i < chainTypeDef->typeArguments.size() && 
+            // Para el tipo padre, usar argumentos evaluados del constructor padre
+            if (chainIndex == 0 && !node.parentTypeName.empty()) {
+                auto parentArgIt = parentArgValues.find(chainTypeDef->attributes[i].name);
+                if (parentArgIt != parentArgValues.end()) {
+                    initValue = parentArgIt->second;
+                }
+            }
+            
+            // Si no hay valor del constructor padre, buscar en parámetros del constructor actual
+            if (!initValue && i < chainTypeDef->typeArguments.size() && 
                 chainTypeDef->typeArguments[i].name == chainTypeDef->attributes[i].name) {
                 auto paramIt = constructorParams.find(chainTypeDef->typeArguments[i].name);
                 if (paramIt != constructorParams.end()) {
@@ -256,7 +306,25 @@ void LLVMCodegenVisitor::createSimpleConstructor(TypeDefNode& node,
                 }
             }
 
-            // Valor por defecto si no se encuentra inicialización
+            // Usar valor por defecto del atributo si existe
+            if (!initValue && chainTypeDef->attributes[i].initExpression) {
+                // Cambiar temporalmente el builder context
+                llvm::BasicBlock* originalBB = builder.GetInsertBlock();
+                builder.SetInsertPoint(constructorBB);
+                
+                // Evaluar la expresión por defecto
+                chainTypeDef->attributes[i].initExpression->accept(*this);
+                if (lastValue) {
+                    initValue = lastValue;
+                }
+                
+                // Restaurar el builder context
+                if (originalBB) {
+                    builder.SetInsertPoint(originalBB);
+                }
+            }
+
+            // Valor por defecto final si no se encuentra inicialización
             if (!initValue) {
                 std::string attrTypeName = "Number";
                 if (chainTypeDef->attributes[i].type) {
