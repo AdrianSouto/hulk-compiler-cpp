@@ -16,7 +16,6 @@
 "type" { printf("<TYPE>\n"); return TYPE; }
 "inherits" { printf("<INHERITS>\n"); return INHERITS; }
 "new" { printf("<NEW>\n"); return NEW; }
-"self" { printf("<SELF>\n"); return SELF; }
 "base" { printf("<BASE>\n"); return BASE; }
 "if" { printf("<IF>\n"); return IF; }
 "elif" { printf("<ELIF>\n"); return ELIF; }

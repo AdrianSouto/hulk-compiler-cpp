@@ -1,18 +1,11 @@
-// Este es un comentario de línea
-type A {
-    // Comentario dentro de la definición del tipo
+type Point {
+    x = 1;
+    y = 0;
+
+    getX() => self.x;
+    getY() => self.y;
+
+    setX(x) => self.x := x;
+    setY(y) => self.y := y;
 }
-
-// Otro comentario
-type B inherits A {
-    // B hereda de A
-}
-
-type C inherits A {
-}
-
-// Declaración de variable con comentario
-let x : A = new B() in // comentario al final de línea
-    print("Ok"); // Este programa debería funcionar
-
-// Comentario final
+let p = new Point() in print(p.getX());

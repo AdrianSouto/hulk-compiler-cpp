@@ -4,18 +4,29 @@
 #include <vector>
 #include <map>
 #include <sstream>
+#include <regex>
+#include <algorithm>
+#include <set>
 
 struct TokenRule {
     std::string pattern;
     std::string action;
     std::string token_name;
     bool ignore;
+    bool is_keyword;
+    bool is_identifier_pattern;
+    bool is_number_pattern;
+    bool is_string_pattern;
+    bool is_comment_pattern;
 };
 
-class FixedLexerGenerator {
+class GenericLexerGenerator {
 private:
     std::vector<std::string> includes;
     std::vector<TokenRule> rules;
+    std::set<std::string> keywords;
+    std::string header_file = "parser.hpp";
+    std::string ast_headers_file = "../include/AllHeaders.hpp";
     
     std::string escapeForCpp(const std::string& str) {
         std::string result;
@@ -106,6 +117,14 @@ private:
     }
     
 public:
+    void setHeaderFile(const std::string& file) {
+        header_file = file;
+    }
+    
+    void setASTHeadersFile(const std::string& file) {
+        ast_headers_file = file;
+    }
+    
     bool parseDefinitionFile(const std::string& filename) {
         std::ifstream file(filename);
         if (!file.is_open()) {
@@ -144,16 +163,15 @@ public:
     }
     
     void parseRule(const std::string& line) {
-
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#') return;
         
-
+        // Find the action block
         size_t brace_start = std::string::npos;
         bool in_quotes = false;
         for (size_t i = 0; i < line.length(); ++i) {
             char ch = line[i];
             if (ch == '"') {
-
                 in_quotes = !in_quotes;
             } else if (ch == '{' && !in_quotes) {
                 brace_start = i;
@@ -161,7 +179,6 @@ public:
             }
         }
         
-
         size_t brace_end = std::string::npos;
         in_quotes = false;
         for (size_t i = line.length(); i-- > 0;) {
@@ -181,26 +198,14 @@ public:
         std::string pattern = line.substr(0, brace_start);
         std::string action = line.substr(brace_start + 1, brace_end - brace_start - 1);
         
-
+        // Trim whitespace
         pattern.erase(0, pattern.find_first_not_of(" \t"));
         pattern.erase(pattern.find_last_not_of(" \t") + 1);
         action.erase(0, action.find_first_not_of(" \t"));
         action.erase(action.find_last_not_of(" \t") + 1);
         
-
+        // Skip if pattern is just braces
         if (pattern.length() > 2 && pattern.front() == '{' && pattern.back() == '}') {
-            return;
-        }
-        
-
-        if (pattern.length() >= 2 && pattern.front() == '"' && pattern.back() == '"') {
-            pattern = pattern.substr(1, pattern.length() - 2);
-        }
-        
-
-        if (action.find("ignore") != std::string::npos || 
-            action.find("/*") != std::string::npos ||
-            action.empty()) {
             return;
         }
         
@@ -208,8 +213,43 @@ public:
         rule.pattern = pattern;
         rule.action = action;
         rule.ignore = false;
+        rule.is_keyword = false;
+        rule.is_identifier_pattern = false;
+        rule.is_number_pattern = false;
+        rule.is_string_pattern = false;
+        rule.is_comment_pattern = false;
         
-
+        // Detect pattern types
+        if (pattern.find("[a-zA-Z_][a-zA-Z0-9_]*") != std::string::npos) {
+            rule.is_identifier_pattern = true;
+        } else if (pattern.find("[0-9]") != std::string::npos) {
+            rule.is_number_pattern = true;
+        } else if (pattern == "\\\"[^\\\"]*\\\"") {
+            rule.is_string_pattern = true;
+        } else if (pattern.find("//") == 0 || pattern.find("/*") == 0) {
+            rule.is_comment_pattern = true;
+            rule.ignore = true;
+        } else if (pattern.length() >= 2 && pattern.front() == '"' && pattern.back() == '"') {
+            // It's a literal string pattern (keyword or operator)
+            pattern = pattern.substr(1, pattern.length() - 2);
+            rule.pattern = pattern;
+            
+            // Check if it's a keyword by looking at the action
+            if (action.find("return") != std::string::npos && 
+                std::isalpha(pattern[0])) {
+                rule.is_keyword = true;
+                keywords.insert(pattern);
+            }
+        }
+        
+        // Skip ignore patterns
+        if (action.find("ignore") != std::string::npos || 
+            action.find("/*") != std::string::npos ||
+            action.empty()) {
+            rule.ignore = true;
+        }
+        
+        // Extract token name from return statement
         size_t return_pos = action.find("return ");
         if (return_pos != std::string::npos) {
             std::string return_part = action.substr(return_pos + 7);
@@ -242,8 +282,13 @@ public:
         out << "#include <unordered_map>\n\n";
         
         out << "// Include necessary headers for AST types\n";
-        out << "#include \"../include/AllHeaders.hpp\"\n";
-        out << "#include \"parser.hpp\"\n\n";
+        if (!ast_headers_file.empty()) {
+            out << "#include \"" << ast_headers_file << "\"\n";
+        }
+        if (!header_file.empty()) {
+            out << "#include \"" << header_file << "\"\n";
+        }
+        out << "\n";
         
 
         for (const auto& include : includes) {
@@ -262,13 +307,7 @@ public:
         out << "// Keywords map\n";
         out << "std::unordered_map<std::string, int> keywords = {\n";
         for (const auto& rule : rules) {
-            if (rule.pattern == "let" || rule.pattern == "print" || rule.pattern == "function" ||
-                rule.pattern == "if" || rule.pattern == "else" || rule.pattern == "elif" ||
-                rule.pattern == "while" || rule.pattern == "for" || rule.pattern == "in" ||
-                rule.pattern == "type" || rule.pattern == "inherits" || rule.pattern == "new" ||
-                rule.pattern == "base" || rule.pattern == "is" || rule.pattern == "as" ||
-                rule.pattern == "true" || rule.pattern == "false" || rule.pattern == "Number" ||
-                rule.pattern == "String" || rule.pattern == "Boolean") {
+            if (rule.is_keyword && !rule.token_name.empty()) {
                 out << "    {\"" << rule.pattern << "\", " << rule.token_name << "},\n";
             }
         }
@@ -433,13 +472,29 @@ public:
         
 
         out << "    // Multi-character operators\n";
-        for (const auto& rule : rules) {
-            if (rule.pattern.length() == 2 && 
-                rule.pattern != "if" && rule.pattern != "in" && 
-                rule.pattern != "is" && rule.pattern != "as") {
-                out << "    if (current_char() == '" << rule.pattern[0] << "' && peek_char() == '" << rule.pattern[1] << "') {\n";
+        // Sort rules by pattern length (longest first) to handle overlapping patterns correctly
+        std::vector<TokenRule> sorted_rules = rules;
+        std::sort(sorted_rules.begin(), sorted_rules.end(), 
+            [](const TokenRule& a, const TokenRule& b) {
+                return a.pattern.length() > b.pattern.length();
+            });
+        
+        for (const auto& rule : sorted_rules) {
+            if (rule.pattern.length() >= 2 && !rule.is_keyword && !rule.ignore) {
+                out << "    if (";
+                for (size_t i = 0; i < rule.pattern.length(); ++i) {
+                    if (i > 0) out << " && ";
+                    if (i == 0) {
+                        out << "current_char() == '" << rule.pattern[i] << "'";
+                    } else {
+                        out << "peek_char(" << i << ") == '" << rule.pattern[i] << "'";
+                    }
+                }
+                out << ") {\n";
                 out << "        yytext = strdup(\"" << escapeForCpp(rule.pattern) << "\");\n";
-                out << "        advance(); advance();\n";
+                for (size_t i = 0; i < rule.pattern.length(); ++i) {
+                    out << "        advance();\n";
+                }
                 out << "        " << escapeAction(rule.action) << "\n";
                 out << "    }\n";
             }
@@ -492,17 +547,30 @@ public:
         out << "}\n";
         
         out.close();
-        std::cout << "Fixed Bison-compatible lexer generado exitosamente en: " << output_filename << std::endl;
+        std::cout << "Lexer generado exitosamente en: " << output_filename << std::endl;
     }
 };
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        std::cerr << "Uso: " << argv[0] << " <archivo_definicion.txt> <archivo_salida.cpp>" << std::endl;
+    if (argc < 3) {
+        std::cerr << "Uso: " << argv[0] << " <archivo_definicion.txt> <archivo_salida.cpp> [opciones]" << std::endl;
+        std::cerr << "Opciones:" << std::endl;
+        std::cerr << "  --header <archivo>     Especifica el archivo de header del parser (default: parser.hpp)" << std::endl;
+        std::cerr << "  --ast-headers <archivo> Especifica el archivo de headers AST (default: ../include/AllHeaders.hpp)" << std::endl;
         return 1;
     }
     
-    FixedLexerGenerator generator;
+    GenericLexerGenerator generator;
+    
+    // Parse optional arguments
+    for (int i = 3; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--header" && i + 1 < argc) {
+            generator.setHeaderFile(argv[++i]);
+        } else if (arg == "--ast-headers" && i + 1 < argc) {
+            generator.setASTHeadersFile(argv[++i]);
+        }
+    }
     
     if (!generator.parseDefinitionFile(argv[1])) {
         return 1;
