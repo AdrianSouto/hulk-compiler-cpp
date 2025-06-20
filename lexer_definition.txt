@@ -45,6 +45,9 @@
 "=>" { printf("<ARROW>\n"); return ARROW; }
 "**" { printf("<POWER>\n"); return POWER; }
 
+# Comments
+"//"[^\n]* { /* Skip single-line comments */ }
+
 # Single character operators and delimiters
 "+" { printf("<PLUS>\n"); return PLUS; }
 "-" { printf("<MINUS>\n"); return MINUS; }

@@ -75,8 +75,8 @@ bool LetExprNode::validate(IContext* context) {
         // Check type compatibility if type annotation is provided
         if (decl.type && decl.type->getTypeName() != "Unknown") {
             if (exprType && exprType->getTypeName() != "Unknown") {
-                // Check if the expression type matches the declared type
-                if (exprType->getTypeName() != decl.type->getTypeName()) {
+                // Check if the expression type conforms to the declared type
+                if (!exprType->conformsTo(decl.type)) {
                     errors.push_back("Type mismatch for variable '" + decl.id + 
                                    "': expected " + decl.type->getTypeName() + 
                                    " but got " + exprType->getTypeName());

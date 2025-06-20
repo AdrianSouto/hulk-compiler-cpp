@@ -420,6 +420,16 @@ public:
         out << "        return STRING;\n";
         out << "    }\n";
         out << "    \n";
+        out << "    // Comments\n";
+        out << "    if (current_char() == '/' && peek_char() == '/') {\n";
+        out << "        // Skip single-line comment\n";
+        out << "        advance(); advance(); // Skip //\n";
+        out << "        while (current_char() != '\\0' && current_char() != '\\n') {\n";
+        out << "            advance();\n";
+        out << "        }\n";
+        out << "        return yylex(); // Recursively call to get next token\n";
+        out << "    }\n";
+        out << "    \n";
         
 
         out << "    // Multi-character operators\n";
