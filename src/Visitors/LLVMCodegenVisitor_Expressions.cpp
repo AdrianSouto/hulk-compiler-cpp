@@ -184,14 +184,40 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
                 llvm::Type* memberType = structType->getElementType(attrIndex);
                 llvm::Value* convertedVal = val;
                 
+                std::cerr << "DEBUG: Assigning to member '" << node.member << "' at index " << attrIndex << std::endl;
+                std::cerr << "DEBUG: Value type: " << (val->getType()->isPointerTy() ? "pointer" : 
+                    (val->getType()->isDoubleTy() ? "double" : 
+                    (val->getType()->isIntegerTy() ? "integer" : "other"))) << std::endl;
+                std::cerr << "DEBUG: Member type: " << (memberType->isPointerTy() ? "pointer" : 
+                    (memberType->isDoubleTy() ? "double" : 
+                    (memberType->isIntegerTy() ? "integer" : "other"))) << std::endl;
+                
                 if (val->getType() != memberType) {
+                    std::cerr << "DEBUG: Type conversion needed" << std::endl;
                     if (val->getType()->isDoubleTy() && memberType->isIntegerTy(32)) {
                         // Convert double to i32
                         convertedVal = builder.CreateFPToSI(val, memberType, "double_to_int");
+                        std::cerr << "DEBUG: Applied double to int conversion" << std::endl;
                     } else if (val->getType()->isIntegerTy(32) && memberType->isDoubleTy()) {
                         // Convert i32 to double
                         convertedVal = builder.CreateSIToFP(val, memberType, "int_to_double");
+                        std::cerr << "DEBUG: Applied int to double conversion" << std::endl;
+                    } else if (val->getType()->isPointerTy() && memberType->isPointerTy()) {
+                        // Convert between pointer types (e.g., different string pointer types)
+                        convertedVal = builder.CreateBitCast(val, memberType, "ptr_cast");
+                        std::cerr << "DEBUG: Applied pointer cast conversion" << std::endl;
+                    } else {
+                        // For other type mismatches, try a bitcast
+                        try {
+                            convertedVal = builder.CreateBitCast(val, memberType, "type_cast");
+                            std::cerr << "DEBUG: Applied general bitcast conversion" << std::endl;
+                        } catch (...) {
+                            std::cerr << "DEBUG: Bitcast failed, using original value" << std::endl;
+                            convertedVal = val;
+                        }
                     }
+                } else {
+                    std::cerr << "DEBUG: No type conversion needed" << std::endl;
                 }
                 
                 builder.CreateStore(convertedVal, memberPtr);
