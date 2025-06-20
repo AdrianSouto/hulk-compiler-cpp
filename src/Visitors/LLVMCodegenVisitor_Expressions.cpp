@@ -134,32 +134,37 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
         
 
         int attrIndex = -1;
-        size_t currentIndex = 0;
+        size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
         
+        // Build inheritance chain
+        std::vector<TypeDefNode*> inheritanceChain;
+        std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
+            if (typeName.empty()) return;
 
-        if (!typeDef->parentTypeName.empty()) {
-            auto parentTypeIt = types.find(typeDef->parentTypeName);
-            if (parentTypeIt != types.end()) {
-                TypeDefNode* parentTypeDef = parentTypeIt->second;
-                for (size_t i = 0; i < parentTypeDef->attributes.size(); ++i) {
-                    if (parentTypeDef->attributes[i].name == node.member) {
-                        attrIndex = currentIndex;
-                        break;
-                    }
-                    currentIndex++;
+            auto typeIt = types.find(typeName);
+            if (typeIt != types.end()) {
+                TypeDefNode* currentTypeDef = typeIt->second;
+
+                if (!currentTypeDef->parentTypeName.empty()) {
+                    buildChain(currentTypeDef->parentTypeName);
                 }
-            }
-        }
-        
 
-        if (attrIndex == -1) {
-            for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
-                if (typeDef->attributes[i].name == node.member) {
+                inheritanceChain.push_back(currentTypeDef);
+            }
+        };
+
+        buildChain(selfTypeName);
+
+        // Search for the attribute in the inheritance chain
+        for (TypeDefNode* chainTypeDef : inheritanceChain) {
+            for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
+                if (chainTypeDef->attributes[i].name == node.member) {
                     attrIndex = currentIndex;
                     break;
                 }
                 currentIndex++;
             }
+            if (attrIndex >= 0) break;
         }
         
         if (attrIndex >= 0) {
@@ -236,12 +241,78 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
         return;
     }
     
-    // For now, implement basic member access
-    // This would need to be enhanced based on the object type and member
-    std::cerr << "DEBUG: Member access to '" << node.memberName << "'" << std::endl;
-    
-    // TODO: Implement proper member access based on object type
-    lastValue = objPtr; // Placeholder
+    // Determine the type of the object
+    std::string objTypeName = "Object";
+
+    if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
+        auto typeIt = variableTypes.find(varNode->identifier);
+        if (typeIt != variableTypes.end()) {
+            objTypeName = typeIt->second;
+        }
+    } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
+        objTypeName = typeInstNode->typeName;
+    }
+
+    auto typeIt = types.find(objTypeName);
+    if (typeIt != types.end()) {
+        TypeDefNode* typeDef = typeIt->second;
+
+        int attrIndex = -1;
+        size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
+
+        // Build inheritance chain
+        std::vector<TypeDefNode*> inheritanceChain;
+        std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
+            if (typeName.empty()) return;
+
+            auto typeIt = types.find(typeName);
+            if (typeIt != types.end()) {
+                TypeDefNode* currentTypeDef = typeIt->second;
+
+                if (!currentTypeDef->parentTypeName.empty()) {
+                    buildChain(currentTypeDef->parentTypeName);
+                }
+
+                inheritanceChain.push_back(currentTypeDef);
+            }
+        };
+
+        buildChain(objTypeName);
+
+        // Search for the attribute in the inheritance chain
+        for (TypeDefNode* chainTypeDef : inheritanceChain) {
+            for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
+                if (chainTypeDef->attributes[i].name == node.memberName) {
+                    attrIndex = currentIndex;
+                    break;
+                }
+                currentIndex++;
+            }
+            if (attrIndex >= 0) break;
+        }
+
+        if (attrIndex >= 0) {
+            auto structIt = structTypes.find(objTypeName);
+            if (structIt != structTypes.end()) {
+                llvm::StructType* structType = structIt->second;
+
+                llvm::Value* memberPtr = builder.CreateStructGEP(structType, objPtr, attrIndex, "member_ptr");
+                llvm::Type* memberType = structType->getElementType(attrIndex);
+                lastValue = builder.CreateLoad(memberType, memberPtr, "member_value");
+
+                std::cerr << "DEBUG: Successfully loaded member '" << node.memberName << "' from type '" << objTypeName << "'" << std::endl;
+            } else {
+                std::cerr << "Error: Could not find struct type for " << objTypeName << std::endl;
+                lastValue = nullptr;
+            }
+        } else {
+            std::cerr << "Error: Member '" << node.memberName << "' not found in type '" << objTypeName << "'" << std::endl;
+            lastValue = nullptr;
+        }
+    } else {
+        std::cerr << "Error: Type definition not found for object type '" << objTypeName << "'" << std::endl;
+        lastValue = nullptr;
+    }
 }
 
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
@@ -273,30 +344,35 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
         int attrIndex = -1;
         size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
         
-        // Check inherited attributes first
-        if (!typeDef->parentTypeName.empty()) {
-            auto parentTypeIt = types.find(typeDef->parentTypeName);
-            if (parentTypeIt != types.end()) {
-                TypeDefNode* parentTypeDef = parentTypeIt->second;
-                for (size_t i = 0; i < parentTypeDef->attributes.size(); ++i) {
-                    if (parentTypeDef->attributes[i].name == node.attributeName) {
-                        attrIndex = currentIndex;
-                        break;
-                    }
-                    currentIndex++;
+        // Build inheritance chain
+        std::vector<TypeDefNode*> inheritanceChain;
+        std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
+            if (typeName.empty()) return;
+
+            auto typeIt = types.find(typeName);
+            if (typeIt != types.end()) {
+                TypeDefNode* currentTypeDef = typeIt->second;
+
+                if (!currentTypeDef->parentTypeName.empty()) {
+                    buildChain(currentTypeDef->parentTypeName);
                 }
+
+                inheritanceChain.push_back(currentTypeDef);
             }
-        }
-        
-        // Check own attributes
-        if (attrIndex == -1) {
-            for (size_t i = 0; i < typeDef->attributes.size(); ++i) {
-                if (typeDef->attributes[i].name == node.attributeName) {
+        };
+
+        buildChain(selfTypeName);
+
+        // Search for the attribute in the inheritance chain
+        for (TypeDefNode* chainTypeDef : inheritanceChain) {
+            for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
+                if (chainTypeDef->attributes[i].name == node.attributeName) {
                     attrIndex = currentIndex;
                     break;
                 }
                 currentIndex++;
             }
+            if (attrIndex >= 0) break;
         }
         
         if (attrIndex >= 0) {
@@ -351,22 +427,45 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         if (typeIt != variableTypes.end()) {
             objectTypeName = typeIt->second;
         }
+        std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has type '" << objectTypeName << "'" << std::endl;
     } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
         // Direct type instantiation
         objectTypeName = typeInstNode->typeName;
+        std::cerr << "DEBUG: Direct type instantiation of '" << objectTypeName << "'" << std::endl;
     }
     
-    // If we couldn't determine the type, try to infer it from the pointer type
-    if (objectTypeName.empty()) {
-        // Look through struct types to find a match
-        for (const auto& structPair : structTypes) {
-            llvm::Type* expectedPtrType = llvm::PointerType::get(structPair.second, 0);
-            if (objPtr->getType() == expectedPtrType) {
-                objectTypeName = structPair.first;
-                break;
+    // Build list of types to try (including inheritance)
+    std::vector<std::string> typesToTry;
+    if (!objectTypeName.empty()) {
+        typesToTry.push_back(objectTypeName);
+
+        // Add parent types
+        std::string currentParentName = objectTypeName;
+        auto typeIt = types.find(currentParentName);
+        if (typeIt != types.end()) {
+            currentParentName = typeIt->second->parentTypeName;
+            while (!currentParentName.empty()) {
+                typesToTry.push_back(currentParentName);
+                auto parentTypeIt = types.find(currentParentName);
+                if (parentTypeIt != types.end()) {
+                    currentParentName = parentTypeIt->second->parentTypeName;
+                } else {
+                    break;
+                }
             }
         }
+    } else {
+        // If we can't determine the type, try all types
+        for (const auto& typePair : types) {
+            typesToTry.push_back(typePair.first);
+        }
     }
+
+    std::cerr << "DEBUG: Looking for method '" << node.methodName << "' in types: ";
+    for (const auto& type : typesToTry) {
+        std::cerr << type << " ";
+    }
+    std::cerr << std::endl;
     
     // Evaluate arguments
     std::vector<llvm::Value*> args;
@@ -379,22 +478,24 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
     }
     
-    // Construct the method function name using the pattern "TypeName_methodName"
-    std::string methodFuncName = node.methodName; // Default fallback
-    if (!objectTypeName.empty()) {
-        methodFuncName = objectTypeName + "_" + node.methodName;
+    // Search for the method function
+    llvm::Function* methodFunc = nullptr;
+    for (const std::string& typeName : typesToTry) {
+        std::string methodName = typeName + "_" + node.methodName;
+        std::cerr << "DEBUG: Trying method name: " << methodName << std::endl;
+        methodFunc = module.getFunction(methodName);
+        if (methodFunc) {
+            std::cerr << "DEBUG: Found method: " << methodName << std::endl;
+            break;
+        }
     }
-    
-    std::cerr << "DEBUG: Looking for method '" << methodFuncName << "' (object type: '" << objectTypeName << "')" << std::endl;
-    
-    llvm::Function* methodFunc = module.getFunction(methodFuncName);
     
     if (methodFunc) {
         // Call the method
         lastValue = builder.CreateCall(methodFunc, args, "method_result");
-        std::cerr << "DEBUG: Successfully called method '" << methodFuncName << "'" << std::endl;
+        std::cerr << "DEBUG: Successfully called method" << std::endl;
     } else {
-        std::cerr << "Error: Method '" << methodFuncName << "' not found" << std::endl;
+        std::cerr << "Error: Method '" << node.methodName << "' not found for object type" << std::endl;
         lastValue = nullptr;
     }
 }

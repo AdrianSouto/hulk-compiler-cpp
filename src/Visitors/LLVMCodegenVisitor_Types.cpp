@@ -3,15 +3,23 @@
 #include "Statements/TypeDefNode.hpp"
 #include "Statements/DefFuncNode.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
+#include "Expressions/SelfMemberAccessNode.hpp"
+#include "Expressions/MemberAccessNode.hpp"
+#include "Expressions/MethodCallNode.hpp"
 #include "Expressions/IsNode.hpp"
 #include "Expressions/AsNode.hpp"
 #include "Expressions/VariableNode.hpp"
+#include "Expressions/NumberNode.hpp"
+#include "Expressions/StringLiteralNode.hpp"
+#include "Expressions/BooleanNode.hpp"
 #include "Globals.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Instructions.h>
 #include <iostream>
 
 // Mapa global para estructuras de tipos
