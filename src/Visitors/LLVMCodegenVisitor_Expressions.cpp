@@ -11,6 +11,7 @@
 #include "Expressions/VariableNode.hpp"
 #include "Statements/TypeDefNode.hpp"
 #include "Globals.hpp"
+#include "RuntimeTypeInfo.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
@@ -443,55 +444,26 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         return;
     }
     
-    // Determine the type of the object
-    std::string objectTypeName = "";
+    // Get runtime type system
+    SimpleRuntimeTypeSystem& rts = SimpleRuntimeTypeSystem::getInstance();
+    rts.initialize(module, ctx);
+    
+    // Determine the static type of the object
+    std::string staticTypeName = "";
     
     // Try to get the type from the object expression
     if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
         // Look up the variable type
         auto typeIt = variableTypes.find(varNode->identifier);
         if (typeIt != variableTypes.end()) {
-            objectTypeName = typeIt->second;
+            staticTypeName = typeIt->second;
         }
-        std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has type '" << objectTypeName << "'" << std::endl;
+        std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has static type '" << staticTypeName << "'" << std::endl;
     } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
         // Direct type instantiation
-        objectTypeName = typeInstNode->typeName;
-        std::cerr << "DEBUG: Direct type instantiation of '" << objectTypeName << "'" << std::endl;
+        staticTypeName = typeInstNode->typeName;
+        std::cerr << "DEBUG: Direct type instantiation of '" << staticTypeName << "'" << std::endl;
     }
-    
-    // Build list of types to try (including inheritance)
-    std::vector<std::string> typesToTry;
-    if (!objectTypeName.empty()) {
-        typesToTry.push_back(objectTypeName);
-
-        // Add parent types
-        std::string currentParentName = objectTypeName;
-        auto typeIt = types.find(currentParentName);
-        if (typeIt != types.end()) {
-            currentParentName = typeIt->second->parentTypeName;
-            while (!currentParentName.empty()) {
-                typesToTry.push_back(currentParentName);
-                auto parentTypeIt = types.find(currentParentName);
-                if (parentTypeIt != types.end()) {
-                    currentParentName = parentTypeIt->second->parentTypeName;
-                } else {
-                    break;
-                }
-            }
-        }
-    } else {
-        // If we can't determine the type, try all types
-        for (const auto& typePair : types) {
-            typesToTry.push_back(typePair.first);
-        }
-    }
-
-    std::cerr << "DEBUG: Looking for method '" << node.methodName << "' in types: ";
-    for (const auto& type : typesToTry) {
-        std::cerr << type << " ";
-    }
-    std::cerr << std::endl;
     
     // Evaluate arguments
     std::vector<llvm::Value*> args;
@@ -504,24 +476,193 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
     }
     
-    // Search for the method function
-    llvm::Function* methodFunc = nullptr;
-    for (const std::string& typeName : typesToTry) {
-        std::string methodName = typeName + "_" + node.methodName;
-        std::cerr << "DEBUG: Trying method name: " << methodName << std::endl;
-        methodFunc = module.getFunction(methodName);
-        if (methodFunc) {
-            std::cerr << "DEBUG: Found method: " << methodName << std::endl;
-            break;
-        }
-    }
+    // For dynamic dispatch, we need to get the runtime type from the object
+    // First, check if this is a custom type (not a built-in)
+    bool isCustomType = staticTypeName != "Number" && staticTypeName != "String" && 
+                       staticTypeName != "Boolean" && !staticTypeName.empty();
     
-    if (methodFunc) {
-        // Call the method
-        lastValue = builder.CreateCall(methodFunc, args, "method_result");
-        std::cerr << "DEBUG: Successfully called method" << std::endl;
+    if (isCustomType && objPtr->getType()->isPointerTy()) {
+        // Create a function to perform dynamic dispatch
+        std::string dispatchFuncName = "dispatch_" + node.methodName + "_" + staticTypeName;
+        llvm::Function* dispatchFunc = module.getFunction(dispatchFuncName);
+        
+        if (!dispatchFunc) {
+            // Create the dispatch function
+            std::vector<llvm::Type*> paramTypes;
+            for (auto& arg : args) {
+                paramTypes.push_back(arg->getType());
+            }
+            
+            // Return type - for now assume double
+            llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
+            
+            llvm::FunctionType* dispatchFuncType = llvm::FunctionType::get(
+                returnType, paramTypes, false);
+            
+            dispatchFunc = llvm::Function::Create(
+                dispatchFuncType, llvm::Function::InternalLinkage, 
+                dispatchFuncName, module);
+            
+            // Create the dispatch function body
+            llvm::BasicBlock* entryBB = llvm::BasicBlock::Create(ctx, "entry", dispatchFunc);
+            llvm::IRBuilder<> dispatchBuilder(entryBB);
+            
+            auto argIt = dispatchFunc->arg_begin();
+            llvm::Value* selfArg = &*argIt++;
+            
+            // Get the TypeInfo from the object
+            llvm::Value* objAsObjectPtr = dispatchBuilder.CreateBitCast(
+                selfArg, llvm::PointerType::get(rts.getObjectStructType(ctx), 0), "obj_as_object");
+            
+            llvm::Value* typeInfoPtrPtr = dispatchBuilder.CreateStructGEP(
+                rts.getObjectStructType(ctx), objAsObjectPtr, 0, "typeinfo_ptr_ptr");
+            
+            llvm::Value* typeInfoPtr = dispatchBuilder.CreateLoad(
+                llvm::PointerType::get(rts.getTypeInfoStructType(ctx), 0), 
+                typeInfoPtrPtr, "typeinfo_ptr");
+            
+            // Get the type name from TypeInfo
+            llvm::Value* typeNamePtrPtr = dispatchBuilder.CreateStructGEP(
+                rts.getTypeInfoStructType(ctx), typeInfoPtr, 0, "typename_ptr_ptr");
+            
+            llvm::Value* typeNamePtr = dispatchBuilder.CreateLoad(
+                llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), 
+                typeNamePtrPtr, "typename_ptr");
+            
+            // Create blocks for each possible type in the inheritance hierarchy
+            std::vector<std::string> possibleTypes;
+            std::map<std::string, llvm::BasicBlock*> typeBlocks;
+            llvm::BasicBlock* defaultBB = llvm::BasicBlock::Create(ctx, "default", dispatchFunc);
+            
+            // Build inheritance chain for the static type
+            std::function<void(const std::string&)> collectTypes = [&](const std::string& typeName) {
+                if (typeName.empty() || typeBlocks.count(typeName) > 0) return;
+                
+                possibleTypes.push_back(typeName);
+                typeBlocks[typeName] = llvm::BasicBlock::Create(ctx, "type_" + typeName, dispatchFunc);
+                
+                // Also check derived types
+                for (const auto& typePair : types) {
+                    if (typePair.second->parentTypeName == typeName) {
+                        collectTypes(typePair.first);
+                    }
+                }
+            };
+            
+            collectTypes(staticTypeName);
+            
+            // For each possible type, check if the runtime type matches
+            llvm::BasicBlock* currentBB = entryBB;
+            for (size_t i = 0; i < possibleTypes.size(); ++i) {
+                const std::string& typeName = possibleTypes[i];
+                llvm::BasicBlock* nextCheckBB = (i + 1 < possibleTypes.size()) ? 
+                    llvm::BasicBlock::Create(ctx, "check_" + possibleTypes[i+1], dispatchFunc) : defaultBB;
+                
+                dispatchBuilder.SetInsertPoint(currentBB);
+                
+                // Compare type name
+                llvm::Value* expectedTypeName = dispatchBuilder.CreateGlobalStringPtr(typeName, "expected_type_" + typeName);
+                
+                // Call strcmp
+                llvm::Function* strcmpFunc = module.getFunction("strcmp");
+                if (!strcmpFunc) {
+                    llvm::FunctionType* strcmpType = llvm::FunctionType::get(
+                        llvm::Type::getInt32Ty(ctx),
+                        {llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0),
+                         llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)},
+                        false
+                    );
+                    strcmpFunc = llvm::Function::Create(strcmpType, llvm::Function::ExternalLinkage, "strcmp", module);
+                }
+                
+                llvm::Value* cmpResult = dispatchBuilder.CreateCall(strcmpFunc, {typeNamePtr, expectedTypeName}, "strcmp_result");
+                llvm::Value* isEqual = dispatchBuilder.CreateICmpEQ(cmpResult, 
+                    llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0), "is_type_" + typeName);
+                
+                dispatchBuilder.CreateCondBr(isEqual, typeBlocks[typeName], nextCheckBB);
+                
+                // In the type block, call the appropriate method
+                dispatchBuilder.SetInsertPoint(typeBlocks[typeName]);
+                
+                std::string methodName = typeName + "_" + node.methodName;
+                llvm::Function* methodFunc = module.getFunction(methodName);
+                
+                if (methodFunc) {
+                    // Prepare arguments for the method call
+                    std::vector<llvm::Value*> methodArgs;
+                    argIt = dispatchFunc->arg_begin();
+                    for (auto& arg : args) {
+                        methodArgs.push_back(&*argIt++);
+                    }
+                    
+                    llvm::Value* result = dispatchBuilder.CreateCall(methodFunc, methodArgs, "method_result");
+                    dispatchBuilder.CreateRet(result);
+                } else {
+                    // If method not found in this type, check parent
+                    dispatchBuilder.CreateBr(nextCheckBB);
+                }
+                
+                currentBB = nextCheckBB;
+            }
+            
+            // Default case - method not found
+            dispatchBuilder.SetInsertPoint(defaultBB);
+            dispatchBuilder.CreateRet(llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0));
+        }
+        
+        // Call the dispatch function
+        lastValue = builder.CreateCall(dispatchFunc, args, "dispatched_result");
+        std::cerr << "DEBUG: Using dynamic dispatch for method '" << node.methodName << "'" << std::endl;
+        
     } else {
-        std::cerr << "Error: Method '" << node.methodName << "' not found for object type" << std::endl;
-        lastValue = nullptr;
+        // Static dispatch for built-in types or when we can't determine the type
+        // Build list of types to try (including inheritance)
+        std::vector<std::string> typesToTry;
+        if (!staticTypeName.empty()) {
+            typesToTry.push_back(staticTypeName);
+
+            // Add parent types
+            std::string currentParentName = staticTypeName;
+            auto typeIt = types.find(currentParentName);
+            if (typeIt != types.end()) {
+                currentParentName = typeIt->second->parentTypeName;
+                while (!currentParentName.empty()) {
+                    typesToTry.push_back(currentParentName);
+                    auto parentTypeIt = types.find(currentParentName);
+                    if (parentTypeIt != types.end()) {
+                        currentParentName = parentTypeIt->second->parentTypeName;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        std::cerr << "DEBUG: Static dispatch - looking for method '" << node.methodName << "' in types: ";
+        for (const auto& type : typesToTry) {
+            std::cerr << type << " ";
+        }
+        std::cerr << std::endl;
+        
+        // Search for the method function
+        llvm::Function* methodFunc = nullptr;
+        for (const std::string& typeName : typesToTry) {
+            std::string methodName = typeName + "_" + node.methodName;
+            std::cerr << "DEBUG: Trying method name: " << methodName << std::endl;
+            methodFunc = module.getFunction(methodName);
+            if (methodFunc) {
+                std::cerr << "DEBUG: Found method: " << methodName << std::endl;
+                break;
+            }
+        }
+        
+        if (methodFunc) {
+            // Call the method
+            lastValue = builder.CreateCall(methodFunc, args, "method_result");
+            std::cerr << "DEBUG: Successfully called method" << std::endl;
+        } else {
+            std::cerr << "Error: Method '" << node.methodName << "' not found for object type" << std::endl;
+            lastValue = nullptr;
+        }
     }
 }
