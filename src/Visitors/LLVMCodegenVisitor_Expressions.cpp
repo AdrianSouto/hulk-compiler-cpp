@@ -9,6 +9,7 @@
 #include "Expressions/SelfMemberAccessNode.hpp"
 #include "Expressions/MethodCallNode.hpp"
 #include "Expressions/VariableNode.hpp"
+#include "Expressions/FuncCallNode.hpp"
 #include "Statements/TypeDefNode.hpp"
 #include "Globals.hpp"
 #include "RuntimeTypeInfo.hpp"
@@ -463,6 +464,13 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         // Direct type instantiation
         staticTypeName = typeInstNode->typeName;
         std::cerr << "DEBUG: Direct type instantiation of '" << staticTypeName << "'" << std::endl;
+    } else if (auto funcCallNode = dynamic_cast<FuncCallNode*>(node.object)) {
+        // Function call - check if we tracked its return type
+        auto typeIt = variableTypes.find("_last_call_result");
+        if (typeIt != variableTypes.end()) {
+            staticTypeName = typeIt->second;
+            std::cerr << "DEBUG: Function call returns type '" << staticTypeName << "'" << std::endl;
+        }
     }
     
     // Evaluate arguments

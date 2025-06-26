@@ -5,6 +5,7 @@
 #include "Statements/DefFuncNode.hpp"
 #include "Statements/TypeDefNode.hpp"
 #include "Statements/PrintStatementNode.hpp"
+#include "AST/Program.hpp"
 #include "Globals.hpp"
 
 #include <llvm/IR/Constants.h>
@@ -13,6 +14,8 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Verifier.h>
 #include <iostream>
+
+extern Program program;
 
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
@@ -25,6 +28,13 @@ static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMCo
         return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
     } else if (typeName == "Void" || typeName.empty()) {
         return llvm::Type::getVoidTy(ctx);
+    }
+
+    // For user-defined types, check if we have a struct type
+    extern std::map<std::string, llvm::StructType*> structTypes;
+    auto structIt = structTypes.find(typeName);
+    if (structIt != structTypes.end()) {
+        return llvm::PointerType::get(structIt->second, 0);
     }
 
     return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
@@ -431,6 +441,43 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
     
 
     lastValue = builder.CreateCall(callee, argsV, callee->getReturnType()->isVoidTy() ? "" : "call_result");
+    
+    // Track the return type for user-defined types
+    if (lastValue && callee->getReturnType()->isPointerTy()) {
+        // Check if this function returns a user-defined type
+        // Look for the function definition to get the return type
+        for (const auto& typePair : types) {
+            for (const auto& method : typePair.second->methods) {
+                if (auto defFunc = dynamic_cast<DefFuncNode*>(method)) {
+                    if (defFunc->identifier == node.identifier || 
+                        typePair.first + "_" + defFunc->identifier == node.identifier) {
+                        if (defFunc->returnType) {
+                            std::string returnTypeName = defFunc->returnType->toString();
+                            // Store this information for later use
+                            variableTypes["_last_call_result"] = returnTypeName;
+                            std::cerr << "DEBUG: Function '" << node.identifier << "' returns type '" << returnTypeName << "'" << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also check global functions by looking at the actual function in the module
+        llvm::Function* func = module.getFunction(node.identifier);
+        if (func && func->getReturnType()->isPointerTy()) {
+            // Try to find the function definition in the global functions map
+            for (const auto& stmt : program.Statements) {
+                if (auto funcDef = dynamic_cast<DefFuncNode*>(stmt)) {
+                    if (funcDef->identifier == node.identifier && funcDef->returnType) {
+                        std::string returnTypeName = funcDef->returnType->toString();
+                        variableTypes["_last_call_result"] = returnTypeName;
+                        std::cerr << "DEBUG: Function '" << node.identifier << "' returns type '" << returnTypeName << "'" << std::endl;
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void LLVMCodegenVisitor::visit(BaseCallNode& node) {
