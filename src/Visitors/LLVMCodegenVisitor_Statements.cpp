@@ -16,7 +16,10 @@
 #include <llvm/IR/Type.h>
 #include <iostream>
 #include <typeinfo>
+#include <map>
 
+// Global map for struct types
+extern std::map<std::string, llvm::StructType*> structTypes;
 
 static llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, llvm::Type* type, const std::string& varName) {
     llvm::IRBuilder<> tmpB(&function->getEntryBlock(), function->getEntryBlock().begin());
@@ -140,14 +143,64 @@ void LLVMCodegenVisitor::visit(Program& node) {
     // Second pass: Forward declare all functions
     for (StatementNode* stmt : node.Statements) {
         if (DefFuncNode* funcNode = dynamic_cast<DefFuncNode*>(stmt)) {
-            // Create function declaration
+            // Create function declaration with proper types
             std::vector<llvm::Type*> paramTypes;
             for (const auto& param : funcNode->parameters) {
-                // Default to double for now
-                paramTypes.push_back(llvm::Type::getDoubleTy(ctx));
+                std::string typeName = "Number";
+                if (param.type) {
+                    typeName = param.type->toString();
+                }
+                
+                // Use the same type resolution as in the actual function definition
+                llvm::Type* paramType = nullptr;
+                if (typeName == "Number") {
+                    paramType = llvm::Type::getDoubleTy(ctx);
+                } else if (typeName == "String") {
+                    paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                } else if (typeName == "Boolean") {
+                    paramType = llvm::Type::getInt1Ty(ctx);
+                } else if (typeName == "Object") {
+                    paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                } else {
+                    // For user-defined types, check if we have a struct type
+                    extern std::map<std::string, llvm::StructType*> structTypes;
+                    auto structIt = structTypes.find(typeName);
+                    if (structIt != structTypes.end()) {
+                        paramType = llvm::PointerType::get(structIt->second, 0);
+                    } else {
+                        paramType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                    }
+                }
+                
+                paramTypes.push_back(paramType);
             }
             
+            // Determine return type
             llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
+            if (funcNode->returnType) {
+                std::string returnTypeName = funcNode->returnType->toString();
+                if (returnTypeName == "Number") {
+                    returnType = llvm::Type::getDoubleTy(ctx);
+                } else if (returnTypeName == "String") {
+                    returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                } else if (returnTypeName == "Boolean") {
+                    returnType = llvm::Type::getInt1Ty(ctx);
+                } else if (returnTypeName == "Object") {
+                    returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                } else if (returnTypeName == "Void" || returnTypeName.empty()) {
+                    returnType = llvm::Type::getVoidTy(ctx);
+                } else {
+                    // For user-defined types, check if we have a struct type
+                    extern std::map<std::string, llvm::StructType*> structTypes;
+                    auto structIt = structTypes.find(returnTypeName);
+                    if (structIt != structTypes.end()) {
+                        returnType = llvm::PointerType::get(structIt->second, 0);
+                    } else {
+                        returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                    }
+                }
+            }
+            
             llvm::FunctionType* funcType = llvm::FunctionType::get(returnType, paramTypes, false);
             
             // Just create the function declaration, don't generate body yet

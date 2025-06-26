@@ -2,6 +2,7 @@
 #include "Context/Context.hpp"
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include "Statements/DefFuncNode.hpp"
+#include "Statements/TypeDefNode.hpp"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -21,8 +22,27 @@ bool Program::validate() {
     bool valid = true;
     std::vector<std::string> allErrors;
 
-    // First pass: register all function signatures
-    std::cout << "DEBUG: First pass - registering functions..." << std::endl;
+    // First pass: register all types
+    std::cout << "DEBUG: First pass - registering types..." << std::endl;
+    std::vector<TypeDefNode*> types;
+    
+    for (size_t i = 0; i < Statements.size(); i++) {
+        TypeDefNode* typeNode = dynamic_cast<TypeDefNode*>(Statements[i]);
+        if (typeNode) {
+            std::cout << "DEBUG: Registering type " << typeNode->typeName << std::endl;
+            if (!typeNode->validate(context)) {
+                allErrors.push_back("Error in statement " + std::to_string(i+1) + ": " +
+                                   typeNode->getErrorMessage());
+                valid = false;
+                // Continue validating other types instead of breaking
+            } else {
+                types.push_back(typeNode);
+            }
+        }
+    }
+
+    // Second pass: register all function signatures
+    std::cout << "DEBUG: Second pass - registering functions..." << std::endl;
     std::vector<DefFuncNode*> functions;
     
     for (size_t i = 0; i < Statements.size(); i++) {
@@ -40,8 +60,8 @@ bool Program::validate() {
         }
     }
 
-    // Second pass: validate function bodies
-    std::cout << "DEBUG: Second pass - validating function bodies..." << std::endl;
+    // Third pass: validate function bodies
+    std::cout << "DEBUG: Third pass - validating function bodies..." << std::endl;
     for (auto funcNode : functions) {
         std::cout << "DEBUG: Validating body of function " << funcNode->identifier << std::endl;
         if (!funcNode->validateBody(context)) {
@@ -52,11 +72,11 @@ bool Program::validate() {
         }
     }
 
-    // Third pass: validate all other statements
-    std::cout << "DEBUG: Third pass - validating " << Statements.size() << " statements..." << std::endl;
+    // Fourth pass: validate all other statements
+    std::cout << "DEBUG: Fourth pass - validating " << Statements.size() << " statements..." << std::endl;
     for (size_t i = 0; i < Statements.size(); i++) {
-        // Skip functions as they were already validated
-        if (dynamic_cast<DefFuncNode*>(Statements[i])) {
+        // Skip functions and types as they were already validated
+        if (dynamic_cast<DefFuncNode*>(Statements[i]) || dynamic_cast<TypeDefNode*>(Statements[i])) {
             continue;
         }
         
