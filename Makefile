@@ -4,13 +4,13 @@ LLVM_CONFIG = llvm-config
 LLVM_CXXFLAGS = $(shell $(LLVM_CONFIG) --cxxflags | sed 's/-fno-exceptions/-fexceptions/g')
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core)
 
-
+# Directories
 SRC_DIR = src
 INCLUDE_DIR = include
 BUILD_DIR = build
 HULK_DIR = hulk
 
-
+# Source files
 CPP_SOURCES = src/AST/ASTNode.cpp \
               src/AST/Attribute.cpp \
               src/AST/ExpressionNode.cpp \
@@ -79,58 +79,54 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
 
 MAIN_SOURCE = main.cpp
 
-
+# Parser and lexer files
 PARSER_SOURCE = hulk/parser.cpp
 PARSER_HEADER = hulk/parser.hpp
 LEXER_SOURCE = hulk/lexer.cpp
+LEXER_L_FILE = lexer.l
 
-
+# Object files
 OBJECTS = $(CPP_SOURCES:src/%.cpp=build/%.o)
 MAIN_OBJECT = build/main.o
 PARSER_OBJECT = build/parser.o
 LEXER_OBJECT = build/lexer.o
 
-
+# Target executable
 TARGET = hulk/hulk_compiler.exe
 
-
+# Input file for testing
 INPUT_FILE = script.hulk
 
 .PHONY: all compile execute clean force-regenerate
 
-
+# Default target
 all: compile
 
-
+# Compile target
 compile: $(TARGET)
 	@echo "Compilation completed with enhanced runtime type system. Artifacts stored in hulk/"
 
-
+# Build the target executable
 $(TARGET): $(HULK_DIR) $(LEXER_SOURCE) $(PARSER_SOURCE) $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(PARSER_OBJECT) $(LEXER_OBJECT) $(LLVM_LDFLAGS)
 	@echo "Copying additional artifacts to hulk/"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
 	@echo "Hulk compiler with enhanced runtime type system built successfully in hulk/"
 
-
+# Create hulk directory
 $(HULK_DIR):
 	@mkdir -p hulk
 
+# Generate lexer using Flex
+$(LEXER_SOURCE): $(LEXER_L_FILE) | $(HULK_DIR)
+	@echo "Generating lexer using Flex..."
+	flex -o $(LEXER_SOURCE) $(LEXER_L_FILE)
 
-$(LEXER_SOURCE): lexer_definition.txt lexer/lexer_generator | $(HULK_DIR)
-	@echo "Generating lexer from definition..."
-	./lexer/lexer_generator lexer_definition.txt $(LEXER_SOURCE)
-
-
-lexer/lexer_generator: lexer/lexer_generator.cpp
-	@echo "Building lexer generator..."
-	$(CXX) -std=c++17 -o lexer/lexer_generator lexer/lexer_generator.cpp
-
-
+# Generate parser using Bison
 $(PARSER_SOURCE) $(PARSER_HEADER): parser.y | $(HULK_DIR)
 	bison -d -o $(PARSER_SOURCE) parser.y
 
-
+# Create build directories
 $(BUILD_DIR):
 	@mkdir -p build
 	@mkdir -p build/AST
@@ -141,23 +137,24 @@ $(BUILD_DIR):
 	@mkdir -p build/Visitors
 	@mkdir -p build/Lexer
 
-
+# Compile main.cpp
 $(MAIN_OBJECT): $(MAIN_SOURCE) $(PARSER_HEADER) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
-
+# Compile parser
 $(PARSER_OBJECT): $(PARSER_SOURCE) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
+# Compile lexer
 $(LEXER_OBJECT): $(LEXER_SOURCE) $(PARSER_HEADER) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
+# Compile source files
 build/%.o: src/%.cpp | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -c $< -o $@
 
-
-
+# Execute the compiled program
 execute: force-regenerate $(TARGET)
 	@echo "--- Running Enhanced Hulk Compiler with Runtime Type System ---"
 	@cd hulk && \
@@ -171,23 +168,22 @@ execute: force-regenerate $(TARGET)
 	    ./output_exec
 	@echo "--- Enhanced Hulk Compiler Workflow Completed ---"
 
-
+# Force regeneration of parser and lexer
 force-regenerate:
 	@echo "Forcing regeneration of parser and lexer files..."
 	@rm -f $(PARSER_SOURCE) $(PARSER_HEADER)
 	@rm -f $(LEXER_SOURCE)
 	@rm -f $(PARSER_OBJECT) $(LEXER_OBJECT)
 
-
+# Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf build
 	@rm -rf hulk
-	@rm -f lexer/lexer_generator lexer/lexer_generator.exe
 	@rm -f output.ll output.s output_exec output_exec.exe
 	@echo "Clean completed."
 
-
+# Help target
 help:
 	@echo "Available targets:"
 	@echo "  compile  - Compile the Enhanced Hulk compiler with runtime type system"

@@ -12,6 +12,9 @@ Program program;  // Cambiado de Program* a Program para compatibilidad con main
 extern char* yytext;
 %}
 
+/* Enable location tracking */
+%locations
+
 /* Definición de la unión para los valores semánticos */
 %union {
     double number;
