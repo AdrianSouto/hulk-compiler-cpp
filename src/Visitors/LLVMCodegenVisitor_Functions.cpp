@@ -20,13 +20,17 @@ extern Program program;
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
         return llvm::Type::getDoubleTy(ctx);
-    } else if (typeName == "String") {
+    }
+    if (typeName == "String") {
         return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-    } else if (typeName == "Boolean") {
+    }
+    if (typeName == "Boolean") {
         return llvm::Type::getInt1Ty(ctx);
-    } else if (typeName == "Object") {
+    }
+    if (typeName == "Object") {
         return llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
-    } else if (typeName == "Void" || typeName.empty()) {
+    }
+    if (typeName == "Void" || typeName.empty()) {
         return llvm::Type::getVoidTy(ctx);
     }
 
