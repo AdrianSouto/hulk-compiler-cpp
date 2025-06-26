@@ -11,6 +11,7 @@
 #include "Expressions/VariableNode.hpp"
 #include "Expressions/FuncCallNode.hpp"
 #include "Statements/TypeDefNode.hpp"
+#include "Statements/DefFuncNode.hpp"
 #include "Globals.hpp"
 #include "RuntimeTypeInfo.hpp"
 
@@ -39,7 +40,7 @@ void LLVMCodegenVisitor::visit(LetExprNode& node) {
 
 
         if (decl.type) {
-            // Use declared type if available
+            
             variableTypes[decl.id] = decl.type->getTypeName();
         } else if (auto typeInst = dynamic_cast<TypeInstantiationNode*>(decl.expr)) {
             variableTypes[decl.id] = typeInst->typeName;
@@ -136,9 +137,9 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
         
 
         int attrIndex = -1;
-        size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
+        size_t currentIndex = 1; 
         
-        // Build inheritance chain
+        
         std::vector<TypeDefNode*> inheritanceChain;
         std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
             if (typeName.empty()) return;
@@ -157,7 +158,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
 
         buildChain(selfTypeName);
 
-        // Search for the attribute in the inheritance chain
+        
         for (TypeDefNode* chainTypeDef : inheritanceChain) {
             for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
                 if (chainTypeDef->attributes[i].name == node.member) {
@@ -182,7 +183,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
                 llvm::Value* memberPtr = builder.CreateStructGEP(structType, typedSelfPtr, attrIndex, "member_ptr");
                 
 
-                // Convert value to the correct type if needed
+                
                 llvm::Type* memberType = structType->getElementType(attrIndex);
                 llvm::Value* convertedVal = val;
                 
@@ -197,19 +198,19 @@ void LLVMCodegenVisitor::visit(SelfMemberAssignmentNode& node) {
                 if (val->getType() != memberType) {
                     std::cerr << "DEBUG: Type conversion needed" << std::endl;
                     if (val->getType()->isDoubleTy() && memberType->isIntegerTy(32)) {
-                        // Convert double to i32
+                        
                         convertedVal = builder.CreateFPToSI(val, memberType, "double_to_int");
                         std::cerr << "DEBUG: Applied double to int conversion" << std::endl;
                     } else if (val->getType()->isIntegerTy(32) && memberType->isDoubleTy()) {
-                        // Convert i32 to double
+                        
                         convertedVal = builder.CreateSIToFP(val, memberType, "int_to_double");
                         std::cerr << "DEBUG: Applied int to double conversion" << std::endl;
                     } else if (val->getType()->isPointerTy() && memberType->isPointerTy()) {
-                        // Convert between pointer types (e.g., different string pointer types)
+                        
                         convertedVal = builder.CreateBitCast(val, memberType, "ptr_cast");
                         std::cerr << "DEBUG: Applied pointer cast conversion" << std::endl;
                     } else {
-                        // For other type mismatches, try a bitcast
+                        
                         try {
                             convertedVal = builder.CreateBitCast(val, memberType, "type_cast");
                             std::cerr << "DEBUG: Applied general bitcast conversion" << std::endl;
@@ -259,7 +260,7 @@ void LLVMCodegenVisitor::visit(BlockExprNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
-    // Evaluate the object expression
+    
     node.object->accept(*this);
     llvm::Value* objPtr = lastValue;
     
@@ -269,7 +270,7 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
         return;
     }
     
-    // Determine the type of the object
+    
     std::string objTypeName = "Object";
 
     if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
@@ -286,9 +287,9 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
         TypeDefNode* typeDef = typeIt->second;
 
         int attrIndex = -1;
-        size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
+        size_t currentIndex = 1; 
 
-        // Build inheritance chain
+        
         std::vector<TypeDefNode*> inheritanceChain;
         std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
             if (typeName.empty()) return;
@@ -307,7 +308,7 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
 
         buildChain(objTypeName);
 
-        // Search for the attribute in the inheritance chain
+        
         for (TypeDefNode* chainTypeDef : inheritanceChain) {
             for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
                 if (chainTypeDef->attributes[i].name == node.memberName) {
@@ -344,7 +345,7 @@ void LLVMCodegenVisitor::visit(MemberAccessNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
-    // Find 'self' in the current context
+    
     llvm::Value* selfPtr = nullptr;
     
     for (auto it = localVarsStack.rbegin(); it != localVarsStack.rend(); ++it) {
@@ -361,18 +362,18 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
         return;
     }
     
-    // Get the current type name
+    
     std::string selfTypeName = currentTypeName.empty() ? "Object" : currentTypeName;
     
-    // Find the attribute in the type definition
+    
     auto typeIt = types.find(selfTypeName);
     if (typeIt != types.end()) {
         TypeDefNode* typeDef = typeIt->second;
         
         int attrIndex = -1;
-        size_t currentIndex = 1; // Start from 1 to skip TypeInfo* field
+        size_t currentIndex = 1; 
         
-        // Build inheritance chain
+        
         std::vector<TypeDefNode*> inheritanceChain;
         std::function<void(const std::string&)> buildChain = [&](const std::string& typeName) {
             if (typeName.empty()) return;
@@ -391,7 +392,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
 
         buildChain(selfTypeName);
 
-        // Search for the attribute in the inheritance chain
+        
         for (TypeDefNode* chainTypeDef : inheritanceChain) {
             for (size_t i = 0; i < chainTypeDef->attributes.size(); ++i) {
                 if (chainTypeDef->attributes[i].name == node.attributeName) {
@@ -404,18 +405,18 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
         }
         
         if (attrIndex >= 0) {
-            // Get the struct type
+            
             auto structIt = structTypes.find(selfTypeName);
             if (structIt != structTypes.end()) {
                 llvm::StructType* structType = structIt->second;
                 
-                // Cast self pointer to the correct struct type
+                
                 llvm::Value* typedSelfPtr = builder.CreateBitCast(selfPtr, llvm::PointerType::get(structType, 0), "typed_self");
                 
-                // Get pointer to the member
+                
                 llvm::Value* memberPtr = builder.CreateStructGEP(structType, typedSelfPtr, attrIndex, "member_ptr");
                 
-                // Load the member value
+                
                 llvm::Type* memberType = structType->getElementType(attrIndex);
                 lastValue = builder.CreateLoad(memberType, memberPtr, "member_value");
                 
@@ -435,7 +436,7 @@ void LLVMCodegenVisitor::visit(SelfMemberAccessNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(MethodCallNode& node) {
-    // Evaluate the object expression
+    
     node.object->accept(*this);
     llvm::Value* objPtr = lastValue;
     
@@ -445,27 +446,33 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         return;
     }
     
-    // Get runtime type system
+    
     SimpleRuntimeTypeSystem& rts = SimpleRuntimeTypeSystem::getInstance();
     rts.initialize(module, ctx);
     
-    // Determine the static type of the object
+    
     std::string staticTypeName = "";
     
-    // Try to get the type from the object expression
+    
     if (auto varNode = dynamic_cast<VariableNode*>(node.object)) {
-        // Look up the variable type
-        auto typeIt = variableTypes.find(varNode->identifier);
-        if (typeIt != variableTypes.end()) {
-            staticTypeName = typeIt->second;
+        
+        if (varNode->identifier == "self" && !currentTypeName.empty()) {
+            staticTypeName = currentTypeName;
+            std::cerr << "DEBUG: 'self' has current type '" << staticTypeName << "'" << std::endl;
+        } else {
+            
+            auto typeIt = variableTypes.find(varNode->identifier);
+            if (typeIt != variableTypes.end()) {
+                staticTypeName = typeIt->second;
+            }
+            std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has static type '" << staticTypeName << "'" << std::endl;
         }
-        std::cerr << "DEBUG: Variable '" << varNode->identifier << "' has static type '" << staticTypeName << "'" << std::endl;
     } else if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(node.object)) {
-        // Direct type instantiation
+        
         staticTypeName = typeInstNode->typeName;
         std::cerr << "DEBUG: Direct type instantiation of '" << staticTypeName << "'" << std::endl;
     } else if (auto funcCallNode = dynamic_cast<FuncCallNode*>(node.object)) {
-        // Function call - check if we tracked its return type
+        
         auto typeIt = variableTypes.find("_last_call_result");
         if (typeIt != variableTypes.end()) {
             staticTypeName = typeIt->second;
@@ -473,9 +480,9 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
     }
     
-    // Evaluate arguments
+    
     std::vector<llvm::Value*> args;
-    args.push_back(objPtr); // Add 'self' as first argument
+    args.push_back(objPtr); 
     
     for (auto arg : node.arguments) {
         arg->accept(*this);
@@ -484,25 +491,72 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
     }
     
-    // For dynamic dispatch, we need to get the runtime type from the object
-    // First, check if this is a custom type (not a built-in)
+    
+    
     bool isCustomType = staticTypeName != "Number" && staticTypeName != "String" && 
                        staticTypeName != "Boolean" && !staticTypeName.empty();
     
     if (isCustomType && objPtr->getType()->isPointerTy()) {
-        // Create a function to perform dynamic dispatch
+        
         std::string dispatchFuncName = "dispatch_" + node.methodName + "_" + staticTypeName;
         llvm::Function* dispatchFunc = module.getFunction(dispatchFuncName);
         
         if (!dispatchFunc) {
-            // Create the dispatch function
+            
             std::vector<llvm::Type*> paramTypes;
             for (auto& arg : args) {
                 paramTypes.push_back(arg->getType());
             }
             
-            // Return type - for now assume double
-            llvm::Type* returnType = llvm::Type::getDoubleTy(ctx);
+            
+            llvm::Type* returnType = llvm::Type::getDoubleTy(ctx); 
+            
+            
+            bool foundMethod = false;
+            std::function<void(const std::string&)> searchForMethod = [&](const std::string& typeName) {
+                if (foundMethod || typeName.empty()) return;
+                
+                auto typeIt = types.find(typeName);
+                if (typeIt != types.end()) {
+                    TypeDefNode* typeDef = typeIt->second;
+                    
+                    
+                    for (auto method : typeDef->methods) {
+                        if (auto defFunc = dynamic_cast<DefFuncNode*>(method)) {
+                            if (defFunc->identifier == node.methodName) {
+                                foundMethod = true;
+                                if (defFunc->returnType) {
+                                    std::string returnTypeName = defFunc->returnType->toString();
+                                    if (returnTypeName == "Number") {
+                                        returnType = llvm::Type::getDoubleTy(ctx);
+                                    } else if (returnTypeName == "String") {
+                                        returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                                    } else if (returnTypeName == "Boolean") {
+                                        returnType = llvm::Type::getInt1Ty(ctx);
+                                    } else {
+                                        
+                                        auto structIt = structTypes.find(returnTypeName);
+                                        if (structIt != structTypes.end()) {
+                                            returnType = llvm::PointerType::get(structIt->second, 0);
+                                        } else {
+                                            returnType = llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0);
+                                        }
+                                    }
+                                } else {
+                                    
+                                    returnType = llvm::Type::getDoubleTy(ctx);
+                                }
+                                return;
+                            }
+                        }
+                    }
+                    
+                    
+                    searchForMethod(typeDef->parentTypeName);
+                }
+            };
+            
+            searchForMethod(staticTypeName);
             
             llvm::FunctionType* dispatchFuncType = llvm::FunctionType::get(
                 returnType, paramTypes, false);
@@ -511,14 +565,14 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                 dispatchFuncType, llvm::Function::InternalLinkage, 
                 dispatchFuncName, module);
             
-            // Create the dispatch function body
+            
             llvm::BasicBlock* entryBB = llvm::BasicBlock::Create(ctx, "entry", dispatchFunc);
             llvm::IRBuilder<> dispatchBuilder(entryBB);
             
             auto argIt = dispatchFunc->arg_begin();
             llvm::Value* selfArg = &*argIt++;
             
-            // Get the TypeInfo from the object
+            
             llvm::Value* objAsObjectPtr = dispatchBuilder.CreateBitCast(
                 selfArg, llvm::PointerType::get(rts.getObjectStructType(ctx), 0), "obj_as_object");
             
@@ -529,7 +583,7 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                 llvm::PointerType::get(rts.getTypeInfoStructType(ctx), 0), 
                 typeInfoPtrPtr, "typeinfo_ptr");
             
-            // Get the type name from TypeInfo
+            
             llvm::Value* typeNamePtrPtr = dispatchBuilder.CreateStructGEP(
                 rts.getTypeInfoStructType(ctx), typeInfoPtr, 0, "typename_ptr_ptr");
             
@@ -537,19 +591,19 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                 llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0), 
                 typeNamePtrPtr, "typename_ptr");
             
-            // Create blocks for each possible type in the inheritance hierarchy
+            
             std::vector<std::string> possibleTypes;
             std::map<std::string, llvm::BasicBlock*> typeBlocks;
             llvm::BasicBlock* defaultBB = llvm::BasicBlock::Create(ctx, "default", dispatchFunc);
             
-            // Build inheritance chain for the static type
+            
             std::function<void(const std::string&)> collectTypes = [&](const std::string& typeName) {
                 if (typeName.empty() || typeBlocks.count(typeName) > 0) return;
                 
                 possibleTypes.push_back(typeName);
                 typeBlocks[typeName] = llvm::BasicBlock::Create(ctx, "type_" + typeName, dispatchFunc);
                 
-                // Also check derived types
+                
                 for (const auto& typePair : types) {
                     if (typePair.second->parentTypeName == typeName) {
                         collectTypes(typePair.first);
@@ -559,7 +613,7 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
             
             collectTypes(staticTypeName);
             
-            // For each possible type, check if the runtime type matches
+            
             llvm::BasicBlock* currentBB = entryBB;
             for (size_t i = 0; i < possibleTypes.size(); ++i) {
                 const std::string& typeName = possibleTypes[i];
@@ -568,10 +622,10 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                 
                 dispatchBuilder.SetInsertPoint(currentBB);
                 
-                // Compare type name
+                
                 llvm::Value* expectedTypeName = dispatchBuilder.CreateGlobalStringPtr(typeName, "expected_type_" + typeName);
                 
-                // Call strcmp
+                
                 llvm::Function* strcmpFunc = module.getFunction("strcmp");
                 if (!strcmpFunc) {
                     llvm::FunctionType* strcmpType = llvm::FunctionType::get(
@@ -589,14 +643,31 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                 
                 dispatchBuilder.CreateCondBr(isEqual, typeBlocks[typeName], nextCheckBB);
                 
-                // In the type block, call the appropriate method
+                
                 dispatchBuilder.SetInsertPoint(typeBlocks[typeName]);
                 
-                std::string methodName = typeName + "_" + node.methodName;
-                llvm::Function* methodFunc = module.getFunction(methodName);
+                
+                llvm::Function* methodFunc = nullptr;
+                std::string methodOwnerType = typeName;
+                
+                
+                while (!methodOwnerType.empty() && !methodFunc) {
+                    std::string methodName = methodOwnerType + "_" + node.methodName;
+                    methodFunc = module.getFunction(methodName);
+                    
+                    if (!methodFunc) {
+                        
+                        auto typeIt = types.find(methodOwnerType);
+                        if (typeIt != types.end() && !typeIt->second->parentTypeName.empty()) {
+                            methodOwnerType = typeIt->second->parentTypeName;
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 
                 if (methodFunc) {
-                    // Prepare arguments for the method call
+                    
                     std::vector<llvm::Value*> methodArgs;
                     argIt = dispatchFunc->arg_begin();
                     for (auto& arg : args) {
@@ -606,30 +677,44 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
                     llvm::Value* result = dispatchBuilder.CreateCall(methodFunc, methodArgs, "method_result");
                     dispatchBuilder.CreateRet(result);
                 } else {
-                    // If method not found in this type, check parent
-                    dispatchBuilder.CreateBr(nextCheckBB);
+                    
+                    dispatchBuilder.CreateBr(defaultBB);
                 }
                 
                 currentBB = nextCheckBB;
             }
             
-            // Default case - method not found
+            
             dispatchBuilder.SetInsertPoint(defaultBB);
-            dispatchBuilder.CreateRet(llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0));
+            
+            
+            llvm::Value* defaultReturnValue = nullptr;
+            if (returnType->isDoubleTy()) {
+                defaultReturnValue = llvm::ConstantFP::get(returnType, 0.0);
+            } else if (returnType->isIntegerTy()) {
+                defaultReturnValue = llvm::ConstantInt::get(returnType, 0);
+            } else if (returnType->isPointerTy()) {
+                defaultReturnValue = llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(returnType));
+            } else {
+                
+                defaultReturnValue = llvm::ConstantFP::get(llvm::Type::getDoubleTy(ctx), 0.0);
+            }
+            
+            dispatchBuilder.CreateRet(defaultReturnValue);
         }
         
-        // Call the dispatch function
+        
         lastValue = builder.CreateCall(dispatchFunc, args, "dispatched_result");
         std::cerr << "DEBUG: Using dynamic dispatch for method '" << node.methodName << "'" << std::endl;
         
     } else {
-        // Static dispatch for built-in types or when we can't determine the type
-        // Build list of types to try (including inheritance)
+        
+        
         std::vector<std::string> typesToTry;
         if (!staticTypeName.empty()) {
             typesToTry.push_back(staticTypeName);
 
-            // Add parent types
+            
             std::string currentParentName = staticTypeName;
             auto typeIt = types.find(currentParentName);
             if (typeIt != types.end()) {
@@ -652,7 +737,7 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
         std::cerr << std::endl;
         
-        // Search for the method function
+        
         llvm::Function* methodFunc = nullptr;
         for (const std::string& typeName : typesToTry) {
             std::string methodName = typeName + "_" + node.methodName;
@@ -665,7 +750,7 @@ void LLVMCodegenVisitor::visit(MethodCallNode& node) {
         }
         
         if (methodFunc) {
-            // Call the method
+            
             lastValue = builder.CreateCall(methodFunc, args, "method_result");
             std::cerr << "DEBUG: Successfully called method" << std::endl;
         } else {
