@@ -2,17 +2,10 @@
 #include "Expressions/IsNode.hpp"
 #include "Expressions/VariableNode.hpp"
 #include "Expressions/TypeInstantiationNode.hpp"
-#include "Expressions/NumberNode.hpp"
-#include "Expressions/StringLiteralNode.hpp"
-#include "Expressions/BooleanNode.hpp"
 #include "Statements/TypeDefNode.hpp"
-#include "Types/RuntimeTypeInfo.hpp"
 #include "Globals.hpp"
-
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Type.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/BasicBlock.h>
 #include <iostream>
 
 void LLVMCodegenVisitor::visit(IsNode& node) {
