@@ -96,15 +96,6 @@ IContext* Context::CreateChildContext() {
     return new Context(this);
 }
 
-bool Context::IsInMethod() {
-
-    return false;
-}
-
-bool Context::HasParentMethod() {
-
-    return false;
-}
 
 bool Context::DefineVariable(const std::string& variable, Type* type) {
     // Si la variable ya existe en este contexto, no la redefinimos

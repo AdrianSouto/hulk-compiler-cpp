@@ -43,8 +43,6 @@ public:
     FunctionSignature* GetFunctionSignature(const std::string& function, int args);
     
     IContext* CreateChildContext() override;
-    bool IsInMethod() override;
-    bool HasParentMethod() override;
     ~Context() override = default;
 };
 
