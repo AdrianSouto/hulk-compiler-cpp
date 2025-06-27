@@ -3,19 +3,21 @@
 #include "Types/Type.hpp"
 
 Context::Context() : parent(nullptr) {
-
+    // Register built-in functions
     functions["sin"] = {"x"};
     functions["cos"] = {"x"};
     functions["sqrt"] = {"x"};
     functions["rand"] = {};
 
-
+    // Register built-in function signatures
     functionSignatures.emplace("sin", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("cos", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("sqrt", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("rand", FunctionSignature({}, Type::getNumberType()));
-    variableTypes["PI"] = Type::getNumberType();
+    
+    // Register built-in constants
     variables.insert("PI");
+    variableTypes["PI"] = Type::getNumberType();
 }
 
 Context::Context(IContext* parent) : parent(parent) {}

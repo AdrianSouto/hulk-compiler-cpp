@@ -10,9 +10,7 @@ public:
 
     SelfMemberAccessNode(const std::string& attrName);
 
-    int evaluate() const override;
-    std::string evaluateString() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     ~SelfMemberAccessNode() = default;

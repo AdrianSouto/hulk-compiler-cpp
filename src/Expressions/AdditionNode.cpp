@@ -4,9 +4,6 @@
 AdditionNode::AdditionNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int AdditionNode::evaluate() const {
-    return left->evaluate() + right->evaluate();
-}
 
 char AdditionNode::getOperator() const {
     return '+';

@@ -21,7 +21,7 @@ class Context : public IContext {
 private:
     IContext* parent;
     std::unordered_set<std::string> variables;
-    std::unordered_map<std::string, Type*> variableTypes;  // Nuevo: almacena tipos de variables
+    std::unordered_map<std::string, Type*> variableTypes;
     std::unordered_map<std::string, std::vector<std::string>> functions;
     std::unordered_map<std::string, FunctionSignature> functionSignatures;
 

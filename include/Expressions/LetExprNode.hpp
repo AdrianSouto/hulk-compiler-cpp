@@ -15,11 +15,8 @@ public:
     LetExprNode(const std::vector<VarDeclPair>& decls, ExpressionNode* expr);
     ~LetExprNode() override;
     
-    int evaluate() const override;
-    std::string evaluateString() const override;
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
-    void print(int indent = 0) const override;
     const std::vector<VarDeclPair>& getDeclarations() const { return declarations; }
     ExpressionNode* getBody() const { return body; }
 };

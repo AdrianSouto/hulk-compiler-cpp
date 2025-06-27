@@ -12,7 +12,6 @@ public:
 
     virtual char getOperator() const = 0;
 
-    void print(int indent = 0) const override;
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override = 0;
 

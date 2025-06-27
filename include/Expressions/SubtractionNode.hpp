@@ -7,7 +7,7 @@ class SubtractionNode : public BinaryOperatorNode {
 public:
     SubtractionNode(ExpressionNode* left, ExpressionNode* right);
 
-    int evaluate() const override;
+
     char getOperator() const override;
     void accept(LLVMCodegenVisitor& visitor) override;
 };

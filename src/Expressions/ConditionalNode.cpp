@@ -20,21 +20,6 @@ void ConditionalNode::setElse(ASTNode* elseBody_) {
 
 
 
-void ConditionalNode::print(int indent) const {
-    for (const auto& branch : branches) {
-        for (int i = 0; i < indent; ++i) std::cout << "  ";
-        std::cout << "If/Elif Condition:" << std::endl;
-        branch.condition->print(indent + 1);
-        for (int i = 0; i < indent; ++i) std::cout << "  ";
-        std::cout << "Body (ASTNode):" << std::endl; 
-        branch.body->print(indent + 1);
-    }
-    if (elseBody) {
-        for (int i = 0; i < indent; ++i) std::cout << "  ";
-        std::cout << "Else Body (ASTNode):" << std::endl; 
-        elseBody->print(indent + 1);
-    }
-}
 
 bool ConditionalNode::validate(IContext* context) {
     for (auto& branch : branches) {

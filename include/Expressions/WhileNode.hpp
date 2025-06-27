@@ -11,8 +11,7 @@ public:
 
     WhileNode(ExpressionNode* cond, ASTNode* b);
     
-    int evaluate() const override;
-    void print(int indent = 0) const override;
+;
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     ~WhileNode();

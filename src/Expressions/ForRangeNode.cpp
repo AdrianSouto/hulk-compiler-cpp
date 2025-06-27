@@ -10,64 +10,7 @@
 ForRangeNode::ForRangeNode(const std::string& var, ExpressionNode* start, ExpressionNode* end, ASTNode* b)
     : loopVar(var), startExpr(start), endExpr(end), body(b) {}
 
-int ForRangeNode::evaluate() const {
-    int start = startExpr->evaluate();
-    int end = endExpr->evaluate();
-    int lastValue = 0;
-    
-    // Save the original value of the loop variable if it exists
-    std::string originalValue;
-    bool hadOriginalValue = false;
-    if (variables.find(loopVar) != variables.end()) {
-        originalValue = variables[loopVar];
-        hadOriginalValue = true;
-    }
-    
-    // Execute the loop
-    for (int i = start; i < end; i++) {
-        variables[loopVar] = std::to_string(i);
-        
-        if (auto* exprBody = dynamic_cast<ExpressionNode*>(body)) {
-            lastValue = exprBody->evaluate();
-        } else if (auto* stmtBody = dynamic_cast<StatementNode*>(body)) {
-            stmtBody->execute();
-            // For statement bodies, we don't have a return value
-            // but we keep lastValue as 0
-        }
-    }
-    
-    // Restore the original value of the loop variable
-    if (hadOriginalValue) {
-        variables[loopVar] = originalValue;
-    } else {
-        variables.erase(loopVar);
-    }
-    
-    return lastValue;
-}
 
-void ForRangeNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "ForRange: " << loopVar << " in range(" << std::endl;
-    
-    startExpr->print(indent + 1);
-    std::cout << ", ";
-    endExpr->print(indent + 1);
-    std::cout << ")" << std::endl;
-    
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Body:" << std::endl;
-    
-    if (auto* exprBody = dynamic_cast<ExpressionNode*>(body)) {
-        exprBody->print(indent + 1);
-    } else if (auto* stmtBody = dynamic_cast<StatementNode*>(body)) {
-        stmtBody->print(indent + 1);
-    }
-}
 
 bool ForRangeNode::validate(IContext* context) {
     

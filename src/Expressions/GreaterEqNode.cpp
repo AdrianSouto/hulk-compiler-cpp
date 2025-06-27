@@ -3,9 +3,7 @@
 
 GreaterEqNode::GreaterEqNode(ExpressionNode* l, ExpressionNode* r) : BinaryOperatorNode(l, r) {}
 
-int GreaterEqNode::evaluate() const {
-    return left->evaluate() >= right->evaluate() ? 1 : 0;
-}
+
 
 char GreaterEqNode::getOperator() const {
     return 'G'; 

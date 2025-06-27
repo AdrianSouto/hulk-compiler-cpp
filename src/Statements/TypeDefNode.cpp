@@ -60,55 +60,7 @@ TypeDefNode::TypeDefNode(const std::string& name,
     }
 }
 
-void TypeDefNode::execute() const {
-    
-    types[typeName] = const_cast<TypeDefNode*>(this);
-    
-    
-    Type* newType = createUserDefinedType(typeName, const_cast<TypeDefNode*>(this), parentTypeName);
-    
-    std::cout << "Type '" << typeName << "' defined with " 
-              << typeArguments.size() << " arguments and " 
-              << attributes.size() << " attributes";
-    
-    if (!parentTypeName.empty()) {
-        std::cout << ", inherits from '" << parentTypeName << "'";
-    }
-    
-    std::cout << "." << std::endl;
-}
 
-void TypeDefNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "TypeDef: " << typeName << "(";
-    
-    
-    for (size_t i = 0; i < typeArguments.size(); ++i) {
-        std::cout << typeArguments[i].toString();
-        if (i < typeArguments.size() - 1) std::cout << ", ";
-    }
-    std::cout << ") {" << std::endl;
-    
-    
-    for (const auto& attr : attributes) {
-        for (int i = 0; i < indent + 1; ++i) {
-            std::cout << "  ";
-        }
-        std::cout << "Attribute: " << attr.toString() << std::endl;
-    }
-    
-    
-    for (const auto& method : methods) {
-        method->print(indent + 1);
-    }
-    
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "}" << std::endl;
-}
 
 bool TypeDefNode::validate(IContext* context) {
     

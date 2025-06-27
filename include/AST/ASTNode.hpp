@@ -12,7 +12,7 @@ protected:
     std::string errorMessage;
 
 public:
-    virtual void print(int indent = 0) const = 0;
+
     virtual bool validate(IContext* context) = 0;
     virtual void accept(LLVMCodegenVisitor& visitor) = 0;
     virtual ~ASTNode() = default;

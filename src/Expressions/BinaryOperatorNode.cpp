@@ -58,29 +58,3 @@ bool BinaryOperatorNode::validate(IContext* context) {
     return true;
 }
 
-void BinaryOperatorNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Operator: " << getOperator() << std::endl;
-
-    for (int i = 0; i < indent + 1; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Left: ";
-    if (left) {
-        left->print(indent + 1);
-    } else {
-        std::cout << "nullptr" << std::endl;
-    }
-
-    for (int i = 0; i < indent + 1; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Right: ";
-    if (right) {
-        right->print(indent + 1);
-    } else {
-        std::cout << "nullptr" << std::endl;
-    }
-}

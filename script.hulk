@@ -1,11 +1,13 @@
-type Point {
-    x = 1;
-    y = 0;
+type Person(firstname : String, lastname: String) {
+    firstname: String = firstname;
+    lastname: String = lastname;
 
-    getX() => self.x;
-    getY() => self.y;
-
-    setX(x) => self.x := x;
-    setY(y) => self.y := y;
+    name(): String => self.firstname @@ self.lastname;
 }
-let p = new Point() in print(p.getX());
+
+type Knight inherits Person {
+    name() : String => "Sir" @@ base();
+}
+
+let p = new Knight("Phil", "Collins") in
+    print(p.name());

@@ -1,15 +1,14 @@
 #include "Globals.hpp"
-#include "AST/ExpressionNode.hpp"
 #include "Statements/TypeDefNode.hpp"
 #include "Types/Type.hpp"
 
 #include <llvm/IR/DerivedTypes.h>
 
-std::map<std::string, std::string> variables;
-std::map<std::string, std::pair<std::vector<std::string>, ExpressionNode*>> functions;
+// Type definitions registry
 std::map<std::string, TypeDefNode*> types;
+
+// Type system registry
 std::map<std::string, Type*> typeRegistry;
-std::map<std::string, std::string> variableTypes;
 
 // Global map for LLVM struct types
 std::map<std::string, llvm::StructType*> structTypes;

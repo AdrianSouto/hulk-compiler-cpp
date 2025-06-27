@@ -17,41 +17,6 @@ LetExprNode::~LetExprNode() {
     delete body;
 }
 
-int LetExprNode::evaluate() const {
-    // Save original values of variables that will be shadowed
-    std::map<std::string, std::string> savedValues;
-    for (const auto& decl : declarations) {
-        if (variables.find(decl.id) != variables.end()) {
-            savedValues[decl.id] = variables[decl.id];
-        }
-    }
-    
-    // Evaluate and set the let-bound variables
-    for (const auto& decl : declarations) {
-        int value = decl.expr->evaluate();
-        variables[decl.id] = std::to_string(value);
-    }
-    
-    // Evaluate the body
-    int result = body->evaluate();
-    
-    // Restore original values or remove variables
-    for (const auto& decl : declarations) {
-        if (savedValues.find(decl.id) != savedValues.end()) {
-            variables[decl.id] = savedValues[decl.id];
-        } else {
-            variables.erase(decl.id);
-        }
-    }
-    
-    return result;
-}
-
-std::string LetExprNode::evaluateString() const {
-    
-    
-    return std::to_string(evaluate());
-}
 
 bool LetExprNode::validate(IContext* context) {
     // Create child context for the let expression
@@ -119,17 +84,3 @@ void LetExprNode::accept(LLVMCodegenVisitor& visitor) {
     visitor.visit(*this);
 }
 
-
-void LetExprNode::print(int indent) const {
-    std::string indentation(indent, ' ');
-    std::cout << indentation << "LetExprNode:" << std::endl;
-    
-    std::cout << indentation << "  Declarations:" << std::endl;
-    for (const auto& decl : declarations) {
-        std::cout << indentation << "    " << decl.id << " = " << std::endl;
-        decl.expr->print(indent + 6);
-    }
-    
-    std::cout << indentation << "  Body:" << std::endl;
-    body->print(indent + 4);
-}

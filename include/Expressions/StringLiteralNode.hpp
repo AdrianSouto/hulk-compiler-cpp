@@ -12,9 +12,7 @@ public:
 
     StringLiteralNode(const std::string& val);
 
-    int evaluate() const override;
-    std::string evaluateString() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override { (void)context; return true; }
     Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;

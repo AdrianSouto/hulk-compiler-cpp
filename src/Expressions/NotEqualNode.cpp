@@ -4,9 +4,6 @@
 NotEqualNode::NotEqualNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int NotEqualNode::evaluate() const {
-    return left->evaluate() != right->evaluate();
-}
 
 char NotEqualNode::getOperator() const {
     return '!';

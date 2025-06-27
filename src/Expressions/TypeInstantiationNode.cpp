@@ -13,30 +13,6 @@ TypeInstantiationNode::~TypeInstantiationNode() {
     }
 }
 
-int TypeInstantiationNode::evaluate() const {
-    
-    
-    return 0;
-}
-
-void TypeInstantiationNode::execute() const {
-    std::cout << "Creating instance of type '" << typeName << "' with " 
-              << arguments.size() << " arguments" << std::endl;
-}
-
-void TypeInstantiationNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "TypeInstantiation: " << typeName << "(";
-    
-    for (size_t i = 0; i < arguments.size(); ++i) {
-        if (i > 0) std::cout << ", ";
-        arguments[i]->print(0);
-    }
-    std::cout << ")" << std::endl;
-}
-
 bool TypeInstantiationNode::validate(IContext* context) {
     // First validate all arguments
     for (size_t i = 0; i < arguments.size(); i++) {

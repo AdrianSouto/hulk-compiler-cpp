@@ -13,10 +13,7 @@ public:
     
     MethodCallNode(ExpressionNode* obj, const std::string& method, const std::vector<ExpressionNode*>& args)
         : object(obj), methodName(method), arguments(args) {}
-    
-    int evaluate() const override;
-    void execute() const;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     

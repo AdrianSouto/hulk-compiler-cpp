@@ -7,24 +7,8 @@ MemberAccessNode::~MemberAccessNode() {
     delete object;
 }
 
-int MemberAccessNode::evaluate() const {
-    
-    
-    return 0;
-}
 
-void MemberAccessNode::execute() const {
-    std::cout << "Accessing member '" << memberName << "' of object" << std::endl;
-}
 
-void MemberAccessNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "MemberAccess: ";
-    object->print(0);
-    std::cout << "." << memberName << std::endl;
-}
 
 bool MemberAccessNode::validate(IContext* context) {
     

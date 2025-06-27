@@ -6,18 +6,7 @@
 ConcatenationNode::ConcatenationNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int ConcatenationNode::evaluate() const {
 
-    try {
-        return std::stoi(evaluateString());
-    } catch (...) {
-        return 0;
-    }
-}
-
-std::string ConcatenationNode::evaluateString() const {
-    return left->evaluateString() + right->evaluateString();
-}
 
 char ConcatenationNode::getOperator() const {
     return '@';

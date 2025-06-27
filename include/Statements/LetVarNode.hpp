@@ -16,8 +16,6 @@ public:
 
     LetVarNode(const std::string& id, ExpressionNode* expr, ASTNode* body, Type* type = Type::getUnknownType());
 
-    void execute() const override;
-    void print(int indent = 0) const override;
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     ~LetVarNode();

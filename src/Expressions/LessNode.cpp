@@ -3,9 +3,6 @@
 
 LessNode::LessNode(ExpressionNode* l, ExpressionNode* r) : BinaryOperatorNode(l, r) {}
 
-int LessNode::evaluate() const {
-    return left->evaluate() < right->evaluate() ? 1 : 0;
-}
 
 char LessNode::getOperator() const {
     return '<';

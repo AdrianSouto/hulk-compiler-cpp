@@ -18,19 +18,4 @@ bool UnaryOperatorNode::validate(IContext* context) {
     return true;
 }
 
-void UnaryOperatorNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Unary Operator: " << getOperator() << std::endl;
 
-    for (int i = 0; i < indent + 1; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Operand: ";
-    if (operand) {
-        operand->print(indent + 1);
-    } else {
-        std::cout << "nullptr" << std::endl;
-    }
-}

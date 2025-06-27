@@ -37,8 +37,7 @@ public:
                 const std::vector<ExpressionNode*>& parentArguments,
                 const std::vector<ASTNode*>& members);
 
-    void execute() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
     

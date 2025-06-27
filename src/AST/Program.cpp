@@ -7,14 +7,7 @@
 #include <vector>
 #include <string>
 
-void Program::execute() const {
-    for (const auto& statement : Statements) {
-        if (statement) {
-            statement->print();
-            statement->execute();
-        }
-    }
-}
+
 
 bool Program::validate() {
     std::cout << "DEBUG: Creating context..." << std::endl;

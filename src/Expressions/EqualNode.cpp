@@ -4,9 +4,7 @@
 EqualNode::EqualNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int EqualNode::evaluate() const {
-    return left->evaluate() == right->evaluate();
-}
+
 
 char EqualNode::getOperator() const {
     return '=';

@@ -12,10 +12,7 @@ public:
     
     TypeInstantiationNode(const std::string& name, const std::vector<ExpressionNode*>& args)
         : typeName(name), arguments(args) {}
-    
-    int evaluate() const override;
-    void execute() const;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;
