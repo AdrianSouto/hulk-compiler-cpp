@@ -24,6 +24,11 @@ void LLVMCodegenVisitor::visit(BooleanNode& node) {
 }
 
 void LLVMCodegenVisitor::visit(VariableNode& node) {
+    if (node.identifier == "PI") {
+        lastValue = llvm::ConstantFP::get(builder.getContext(), llvm::APFloat(3.141592653589793));
+        return;
+    }
+
     llvm::AllocaInst* alloca = nullptr;
     for (auto it = localVarsStack.rbegin(); it != localVarsStack.rend(); ++it) {
         auto found = it->find(node.identifier);

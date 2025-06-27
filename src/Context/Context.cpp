@@ -15,6 +15,7 @@ Context::Context() : parent(nullptr) {
     functionSignatures.emplace("sqrt", FunctionSignature({Type::getNumberType()}, Type::getNumberType()));
     functionSignatures.emplace("rand", FunctionSignature({}, Type::getNumberType()));
     variableTypes["PI"] = Type::getNumberType();
+    variables.insert("PI");
 }
 
 Context::Context(IContext* parent) : parent(parent) {}
