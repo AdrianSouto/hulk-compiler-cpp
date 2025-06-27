@@ -22,7 +22,6 @@ extern YYLTYPE yylloc;
 
 /* Helper function to handle newlines */
 void handle_newline() {
-    yylineno++;
     yycolumn = 1;
 }
 
