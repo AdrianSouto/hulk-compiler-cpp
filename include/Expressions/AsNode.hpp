@@ -11,10 +11,7 @@ public:
     
     AsNode(ExpressionNode* expr, const std::string& type) 
         : expression(expr), typeName(type) {}
-    
-    int evaluate() const override;
-    std::string evaluateString() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;

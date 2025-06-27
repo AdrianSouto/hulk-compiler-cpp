@@ -28,8 +28,7 @@ public:
 
     DefFuncNode(const std::string& id, const std::vector<std::string>& args, ExpressionNode* expr);
 
-    void execute() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     bool validateBody(IContext* context);
     void accept(LLVMCodegenVisitor& visitor) override;

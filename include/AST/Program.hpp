@@ -12,7 +12,7 @@ public:
     std::vector<StatementNode*> Statements;
     std::string errorMessage;
 
-    void execute() const;
+
     bool validate();
     const std::string& getErrorMessage() const { return errorMessage; }
     void accept(LLVMCodegenVisitor& visitor);

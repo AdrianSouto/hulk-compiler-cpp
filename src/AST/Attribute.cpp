@@ -3,12 +3,7 @@
 #include "Visitors/LLVMCodegenVisitor.hpp"
 #include <iostream>
 
-void Attribute::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "Attribute: " << toString() << std::endl;
-}
+
 
 bool Attribute::validate(IContext* context) {
     if (hasInitExpression()) {

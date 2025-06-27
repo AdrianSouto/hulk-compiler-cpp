@@ -29,50 +29,8 @@ DefFuncNode::DefFuncNode(const std::string& id, const std::vector<std::string>& 
     }
 }
 
-void DefFuncNode::execute() const {
-    if (!isBlockBody) {
-        std::vector<std::string> argNames;
-        for (const auto& param : parameters) {
-            argNames.push_back(param.name);
-        }
-        functions[identifier] = std::make_pair(argNames, expr);
-    }
 
 
-}
-
-void DefFuncNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "DefFunc: " << identifier << "(";
-    for (size_t i = 0; i < parameters.size(); ++i) {
-        std::cout << parameters[i].toString();
-        if (i < parameters.size() - 1) std::cout << ", ";
-    }
-    std::cout << ")";
-    
-    if (returnType) {
-        std::cout << ": " << returnType->toString();
-    }
-    std::cout << std::endl;
-
-    if (isBlockBody) {
-        for (int i = 0; i < indent + 1; ++i) {
-            std::cout << "  ";
-        }
-        std::cout << "Body (Block): " << std::endl;
-        for (const auto& stmt : statements) {
-            stmt->print(indent + 2);
-        }
-    } else {
-        for (int i = 0; i < indent + 1; ++i) {
-            std::cout << "  ";
-        }
-        std::cout << "Body: ";
-        expr->print(indent + 2);
-    }
-}
 
 bool DefFuncNode::validate(IContext* context) {
     // First, just register the function signature without validating the body

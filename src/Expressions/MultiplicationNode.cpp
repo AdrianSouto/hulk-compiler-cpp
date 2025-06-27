@@ -4,9 +4,6 @@
 MultiplicationNode::MultiplicationNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int MultiplicationNode::evaluate() const {
-    return left->evaluate() * right->evaluate();
-}
 
 char MultiplicationNode::getOperator() const {
     return '*';

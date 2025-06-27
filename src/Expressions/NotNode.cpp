@@ -4,9 +4,7 @@
 NotNode::NotNode(ExpressionNode* operand)
     : UnaryOperatorNode(operand) {}
 
-int NotNode::evaluate() const {
-    return !operand->evaluate();
-}
+
 
 char NotNode::getOperator() const {
     return '!';

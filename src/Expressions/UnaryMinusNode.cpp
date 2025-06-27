@@ -4,13 +4,7 @@
 UnaryMinusNode::UnaryMinusNode(ExpressionNode* operand)
     : UnaryOperatorNode(operand) {}
 
-int UnaryMinusNode::evaluate() const {
-    return -operand->evaluate();
-}
 
-double UnaryMinusNode::evaluateDouble() const {
-    return -operand->evaluateDouble();
-}
 
 char UnaryMinusNode::getOperator() const {
     return '-';

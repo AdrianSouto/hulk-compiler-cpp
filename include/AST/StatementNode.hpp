@@ -5,7 +5,6 @@
 
 class StatementNode : public ASTNode {
 public:
-    virtual void execute() const = 0;
     void accept(LLVMCodegenVisitor& visitor) override = 0;
     ~StatementNode() override = default;
 };

@@ -7,38 +7,7 @@
 AssignmentNode::AssignmentNode(const std::string& id, ExpressionNode* val)
     : identifier(id), value(val) {}
 
-int AssignmentNode::evaluate() const {
-    
-    int assignedValue = value->evaluate();
-    
-    
-    variables[identifier] = std::to_string(assignedValue);
-    
-    
-    return assignedValue;
-}
 
-std::string AssignmentNode::evaluateString() const {
-    
-    std::string assignedValue = value->evaluateString();
-    
-    
-    variables[identifier] = assignedValue;
-    
-    
-    return assignedValue;
-}
-
-void AssignmentNode::print(int indent) const {
-    for (int i = 0; i < indent; i++) std::cout << "  ";
-    std::cout << "Assignment: " << identifier << " := ";
-    if (value) {
-        std::cout << std::endl;
-        value->print(indent + 1);
-    } else {
-        std::cout << "null" << std::endl;
-    }
-}
 
 bool AssignmentNode::validate(IContext* context) {
     

@@ -14,8 +14,7 @@ public:
 
     FuncCallNode(const std::string& id, const std::vector<ExpressionNode*>& arguments);
 
-    int evaluate() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;

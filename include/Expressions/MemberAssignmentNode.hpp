@@ -12,9 +12,7 @@ public:
 
     MemberAssignmentNode(ExpressionNode* obj, const std::string& mem, ExpressionNode* val);
 
-    int evaluate() const override;
-    std::string evaluateString() const override;
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     void accept(LLVMCodegenVisitor& visitor) override;
 

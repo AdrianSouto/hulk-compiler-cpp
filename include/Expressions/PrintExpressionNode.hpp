@@ -13,9 +13,6 @@ public:
     ~PrintExpressionNode();
     
     void accept(LLVMCodegenVisitor& visitor) override;
-    void print(int indent = 0) const override;
     bool validate(IContext* context) override;
-    int evaluate() const override;
-    double evaluateDouble() const override;
-    std::string evaluateString() const override;
+
 };

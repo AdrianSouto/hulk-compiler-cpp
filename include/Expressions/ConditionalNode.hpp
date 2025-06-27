@@ -21,11 +21,7 @@ public:
     ConditionalNode();
     void addBranch(ExpressionNode* condition, ASTNode* body);
     void setElse(ASTNode* elseBody);
-    void execute() const {}
-    int evaluate() const override {
-        return 0;
-    }
-    void print(int indent = 0) const override;
+
     bool validate(IContext* context) override;
     Type* inferType(IContext* context) const override;
     void accept(LLVMCodegenVisitor& visitor) override;

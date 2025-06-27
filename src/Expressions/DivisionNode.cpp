@@ -4,9 +4,7 @@
 DivisionNode::DivisionNode(ExpressionNode* left, ExpressionNode* right)
     : BinaryOperatorNode(left, right) {}
 
-int DivisionNode::evaluate() const {
-    return left->evaluate() / right->evaluate();
-}
+
 
 char DivisionNode::getOperator() const {
     return '/';

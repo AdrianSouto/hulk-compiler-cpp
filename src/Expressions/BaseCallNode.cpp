@@ -7,25 +7,7 @@
 BaseCallNode::BaseCallNode(const std::vector<ExpressionNode*>& arguments)
     : args(arguments) {}
 
-int BaseCallNode::evaluate() const {
-    
-    
-    return 0;
-}
 
-void BaseCallNode::print(int indent) const {
-    for (int i = 0; i < indent; ++i) {
-        std::cout << "  ";
-    }
-    std::cout << "BaseCall()" << std::endl;
-    for (size_t i = 0; i < args.size(); ++i) {
-        for (int j = 0; j < indent + 1; ++j) {
-            std::cout << "  ";
-        }
-        std::cout << "Arg " << i << ": ";
-        args[i]->print(indent + 2);
-    }
-}
 
 bool BaseCallNode::validate(IContext* context) {
     
