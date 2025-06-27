@@ -1,11 +1,35 @@
-type Point {
-    x = 1;
-    y = 0;
-
-    getX() => self.x;
-    getY() => self.y;
-
-    setX(x) => self.x := x;
-    setY(y) => self.y := y;
+type G {
+    a : Number = 3;
+    foo() => 5;
 }
-let p = new Point() in print(p.getX());
+
+
+type Holis inherits G {
+    a : Number = 3;
+}
+
+type A  inherits Holis{
+    a : Number = 3;
+    foo() => 10;
+}
+
+type B inherits A {
+    a : Number = 3;
+    foo() => 20;
+}
+
+type C inherits A {
+    a : Number = 3;
+    foo() => 40;
+}
+
+function bar(x:Number) : A {
+    if (x>5) {
+        new B();
+    } else {
+        new C();
+    };
+}
+
+print(bar(5).foo());
+print(bar(9).foo());

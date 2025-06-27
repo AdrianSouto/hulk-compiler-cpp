@@ -19,13 +19,6 @@ int AsNode::evaluate() const {
 }
 
 std::string AsNode::evaluateString() const {
-    
-    
-    
-    
-    
-    
-    
     if (auto typeInstNode = dynamic_cast<TypeInstantiationNode*>(expression)) {
         
         Type* exprType = getTypeByName(typeInstNode->typeName);
@@ -47,8 +40,6 @@ std::string AsNode::evaluateString() const {
     
     
     if (dynamic_cast<VariableNode*>(expression)) {
-        
-        
         return expression->evaluateString();
     }
     
@@ -67,27 +58,18 @@ void AsNode::print(int indent) const {
 }
 
 bool AsNode::validate(IContext* context) {
-    
     if (!expression->validate(context)) {
         errorMessage = "Error in 'as' expression: " + expression->getErrorMessage();
         return false;
     }
-    
-    
-    
-    
-    
     return true;
 }
 
 Type* AsNode::inferType(IContext* context) const {
-    // The result type of an 'as' expression is the target type
     Type* targetType = getTypeByName(typeName);
     if (targetType) {
         return targetType;
     }
-    
-    // If target type is not found, return the default
     return Type::getNumberType();
 }
 

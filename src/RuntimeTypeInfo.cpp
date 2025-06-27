@@ -105,9 +105,7 @@ llvm::GlobalVariable* SimpleRuntimeTypeSystem::createTypeInfoGlobal(const std::s
         typeInfoStruct, typeName + "_typeinfo");
     
     typeInfoGlobals[typeName] = typeInfoGlobal;
-    
-    std::cerr << "DEBUG: Created TypeInfo for '" << typeName << "' with parent '" << parentTypeName << "'" << std::endl;
-    
+
     return typeInfoGlobal;
 }
 
