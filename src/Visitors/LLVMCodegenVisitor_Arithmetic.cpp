@@ -121,8 +121,22 @@ void LLVMCodegenVisitor::visit(PowerNode& node) {
     llvm::Value* r = lastValue;
 
     llvm::Type* doubleTy = llvm::Type::getDoubleTy(ctx);
-    llvm::Value* lDouble = builder.CreateSIToFP(l, doubleTy, "lftodbl");
-    llvm::Value* rDouble = builder.CreateSIToFP(r, doubleTy, "rttodbl");
+    
+    // Convert operands to double if they aren't already
+    llvm::Value* lDouble = l;
+    llvm::Value* rDouble = r;
+    
+    if (!l->getType()->isDoubleTy()) {
+        if (l->getType()->isIntegerTy()) {
+            lDouble = builder.CreateSIToFP(l, doubleTy, "lftodbl");
+        }
+    }
+    
+    if (!r->getType()->isDoubleTy()) {
+        if (r->getType()->isIntegerTy()) {
+            rDouble = builder.CreateSIToFP(r, doubleTy, "rttodbl");
+        }
+    }
 
     llvm::Function* powFunc = module.getFunction("llvm.pow.f64");
     if (!powFunc) {
@@ -132,8 +146,8 @@ void LLVMCodegenVisitor::visit(PowerNode& node) {
             powType, llvm::Function::ExternalLinkage, "llvm.pow.f64", module);
     }
 
-    llvm::Value* powResult = builder.CreateCall(powFunc, {lDouble, rDouble}, "powtmp");
-    lastValue = builder.CreateFPToSI(powResult, llvm::Type::getInt32Ty(ctx), "powint");
+    // Keep the result as double instead of converting to int
+    lastValue = builder.CreateCall(powFunc, {lDouble, rDouble}, "powtmp");
 }
 
 void LLVMCodegenVisitor::visit(ModuloNode& node) {
