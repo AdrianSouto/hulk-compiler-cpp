@@ -1,0 +1,31 @@
+Terminals: FUNCTION, TYPE, INHERITS, NEW, BASE, IF, ELIF, ELSE, WHILE, FOR, IN, IS, AS, LET, PRINT, TRUE, FALSE, TYPE_NUMBER, TYPE_STRING, TYPE_BOOLEAN, IDENTIFIER, NUMBER, STRING, LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON, COMMA, COLON, DOT, PLUS, MINUS, MULTIPLY, DIVIDE, MODULO, POWER, CONCAT, CONCAT_SPACE, EQUALS, ASSIGN, EQEQ, NOTEQ, LESS, LESSEQ, GREATER, GREATEREQ, AND, OR, NOT, ARROW, EOF
+
+NonTerminals: Program, Expression, ExpressionTail, Term, TermTail, Factor, FactorTail, Atom
+
+Productions:
+Program -> Expression
+
+Expression -> Term ExpressionTail
+
+ExpressionTail -> PLUS Term ExpressionTail
+ExpressionTail -> MINUS Term ExpressionTail
+ExpressionTail -> ε
+
+Term -> Factor TermTail
+
+TermTail -> MULTIPLY Factor TermTail
+TermTail -> DIVIDE Factor TermTail
+TermTail -> ε
+
+Factor -> Atom FactorTail
+
+FactorTail -> POWER Atom FactorTail
+FactorTail -> ε
+
+Atom -> NUMBER
+Atom -> STRING
+Atom -> TRUE
+Atom -> FALSE
+Atom -> IDENTIFIER
+Atom -> LPAREN Expression RPAREN
+Atom -> PRINT LPAREN Expression RPAREN

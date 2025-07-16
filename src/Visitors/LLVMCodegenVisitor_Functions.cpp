@@ -15,7 +15,7 @@
 #include <llvm/IR/Verifier.h>
 #include <iostream>
 
-extern Program program;
+// extern Program program; // Not used in this file
 
 static llvm::Type* getLLVMTypeFromName(const std::string& typeName, llvm::LLVMContext& ctx) {
     if (typeName == "Number") {
@@ -469,17 +469,9 @@ void LLVMCodegenVisitor::visit(FuncCallNode& node) {
         // Also check global functions by looking at the actual function in the module
         llvm::Function* func = module.getFunction(node.identifier);
         if (func && func->getReturnType()->isPointerTy()) {
-            // Try to find the function definition in the global functions map
-            for (const auto& stmt : program.Statements) {
-                if (auto funcDef = dynamic_cast<DefFuncNode*>(stmt)) {
-                    if (funcDef->identifier == node.identifier && funcDef->returnType) {
-                        std::string returnTypeName = funcDef->returnType->toString();
-                        variableTypes["_last_call_result"] = returnTypeName;
-                        std::cerr << "DEBUG: Function '" << node.identifier << "' returns type '" << returnTypeName << "'" << std::endl;
-                        break;
-                    }
-                }
-            }
+            // TODO: Find a way to get function return type without accessing global program
+            // For now, we'll rely on the type information from methods in types map
+            std::cerr << "DEBUG: Function '" << node.identifier << "' returns a pointer type" << std::endl;
         }
     }
 }
