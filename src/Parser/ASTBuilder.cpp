@@ -206,12 +206,9 @@ StatementNode* ASTBuilder::buildStatement(ParseNode* node) {
 ExpressionNode* ASTBuilder::buildExpression(ParseNode* node) {
     if (!node || node->children.empty()) return nullptr;
     
-    // For simple grammar: Expression -> Term ExpressionTail
-    if (node->children.size() >= 2) {
-        ExpressionNode* left = buildTerm(node->children[0].get());
-        if (left) {
-            return buildExpressionTail(left, node->children[1].get());
-        }
+    // New grammar: Expression -> OrExpression
+    if (node->children.size() >= 1) {
+        return buildOrExpression(node->children[0].get());
     }
     
     return nullptr;
@@ -540,7 +537,7 @@ ExpressionNode* ASTBuilder::buildPowerExpressionTail(ExpressionNode* left, Parse
 ExpressionNode* ASTBuilder::buildUnaryExpression(ParseNode* node) {
     if (!node || node->children.empty()) return nullptr;
     
-    // UnaryExpr -> NOT UnaryExpr | MINUS UnaryExpr | PostfixExpr
+    // UnaryExpression -> MINUS UnaryExpression | NOT UnaryExpression | Atom
     if (node->children.size() >= 2) {
         std::string op = node->children[0]->symbol.value;
         if (op == "NOT") {
@@ -552,8 +549,8 @@ ExpressionNode* ASTBuilder::buildUnaryExpression(ParseNode* node) {
         }
     }
     
-    // PostfixExpr
-    return buildPostfixExpression(node->children[0].get());
+    // Atom
+    return buildAtom(node->children[0].get());
 }
 
 ExpressionNode* ASTBuilder::buildPostfixExpression(ParseNode* node) {

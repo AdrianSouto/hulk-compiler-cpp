@@ -1,6 +1,6 @@
 Terminals: FUNCTION, TYPE, INHERITS, NEW, BASE, IF, ELIF, ELSE, WHILE, FOR, IN, IS, AS, LET, PRINT, TRUE, FALSE, TYPE_NUMBER, TYPE_STRING, TYPE_BOOLEAN, IDENTIFIER, NUMBER, STRING, LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON, COMMA, COLON, DOT, PLUS, MINUS, MULTIPLY, DIVIDE, MODULO, POWER, CONCAT, CONCAT_SPACE, EQUALS, ASSIGN, EQEQ, NOTEQ, LESS, LESSEQ, GREATER, GREATEREQ, AND, OR, NOT, ARROW, EOF
 
-NonTerminals: Program, StatementList, Statement, Expression, ExpressionTail, Term, TermTail, Factor, FactorTail, Atom
+NonTerminals: Program, StatementList, Statement, Expression, OrExpression, OrExpressionTail, AndExpression, AndExpressionTail, EqualityExpression, EqualityExpressionTail, RelationalExpression, RelationalExpressionTail, AdditiveExpression, AdditiveExpressionTail, MultiplicativeExpression, MultiplicativeExpressionTail, PowerExpression, PowerExpressionTail, UnaryExpression, Atom
 
 Productions:
 Program -> StatementList
@@ -10,22 +10,55 @@ StatementList -> ε
 
 Statement -> Expression SEMICOLON
 
-Expression -> Term ExpressionTail
+Expression -> OrExpression
 
-ExpressionTail -> PLUS Term ExpressionTail
-ExpressionTail -> MINUS Term ExpressionTail
-ExpressionTail -> ε
+OrExpression -> AndExpression OrExpressionTail
 
-Term -> Factor TermTail
+OrExpressionTail -> OR AndExpression OrExpressionTail
+OrExpressionTail -> ε
 
-TermTail -> MULTIPLY Factor TermTail
-TermTail -> DIVIDE Factor TermTail
-TermTail -> ε
+AndExpression -> EqualityExpression AndExpressionTail
 
-Factor -> Atom FactorTail
+AndExpressionTail -> AND EqualityExpression AndExpressionTail
+AndExpressionTail -> ε
 
-FactorTail -> POWER Atom FactorTail
-FactorTail -> ε
+EqualityExpression -> RelationalExpression EqualityExpressionTail
+
+EqualityExpressionTail -> EQEQ RelationalExpression EqualityExpressionTail
+EqualityExpressionTail -> NOTEQ RelationalExpression EqualityExpressionTail
+EqualityExpressionTail -> ε
+
+RelationalExpression -> AdditiveExpression RelationalExpressionTail
+
+RelationalExpressionTail -> LESS AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> LESSEQ AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> GREATER AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> GREATEREQ AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> ε
+
+AdditiveExpression -> MultiplicativeExpression AdditiveExpressionTail
+
+AdditiveExpressionTail -> PLUS MultiplicativeExpression AdditiveExpressionTail
+AdditiveExpressionTail -> MINUS MultiplicativeExpression AdditiveExpressionTail
+AdditiveExpressionTail -> CONCAT MultiplicativeExpression AdditiveExpressionTail
+AdditiveExpressionTail -> CONCAT_SPACE MultiplicativeExpression AdditiveExpressionTail
+AdditiveExpressionTail -> ε
+
+MultiplicativeExpression -> PowerExpression MultiplicativeExpressionTail
+
+MultiplicativeExpressionTail -> MULTIPLY PowerExpression MultiplicativeExpressionTail
+MultiplicativeExpressionTail -> DIVIDE PowerExpression MultiplicativeExpressionTail
+MultiplicativeExpressionTail -> MODULO PowerExpression MultiplicativeExpressionTail
+MultiplicativeExpressionTail -> ε
+
+PowerExpression -> UnaryExpression PowerExpressionTail
+
+PowerExpressionTail -> POWER UnaryExpression PowerExpressionTail
+PowerExpressionTail -> ε
+
+UnaryExpression -> MINUS UnaryExpression
+UnaryExpression -> NOT UnaryExpression
+UnaryExpression -> Atom
 
 Atom -> NUMBER
 Atom -> STRING
