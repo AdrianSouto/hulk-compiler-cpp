@@ -1,9 +1,14 @@
 Terminals: FUNCTION, TYPE, INHERITS, NEW, BASE, IF, ELIF, ELSE, WHILE, FOR, IN, IS, AS, LET, PRINT, TRUE, FALSE, TYPE_NUMBER, TYPE_STRING, TYPE_BOOLEAN, IDENTIFIER, NUMBER, STRING, LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON, COMMA, COLON, DOT, PLUS, MINUS, MULTIPLY, DIVIDE, MODULO, POWER, CONCAT, CONCAT_SPACE, EQUALS, ASSIGN, EQEQ, NOTEQ, LESS, LESSEQ, GREATER, GREATEREQ, AND, OR, NOT, ARROW, EOF
 
-NonTerminals: Program, Expression, ExpressionTail, Term, TermTail, Factor, FactorTail, Atom
+NonTerminals: Program, StatementList, Statement, Expression, ExpressionTail, Term, TermTail, Factor, FactorTail, Atom
 
 Productions:
-Program -> Expression
+Program -> StatementList
+
+StatementList -> Statement StatementList
+StatementList -> ε
+
+Statement -> Expression SEMICOLON
 
 Expression -> Term ExpressionTail
 

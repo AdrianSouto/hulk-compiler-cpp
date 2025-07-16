@@ -69,12 +69,10 @@ Program* ASTBuilder::buildAST(ParseTree* parseTree) {
     if (parseTree->root->symbol.value == "Program") {
         Program* program = new Program();
         
-        // For simple grammar: Program -> Expression | Program -> Expression SEMICOLON
+        // New grammar: Program -> StatementList
         if (!parseTree->root->children.empty()) {
-            ExpressionNode* expr = buildExpression(parseTree->root->children[0].get());
-            if (expr) {
-                program->Statements.push_back(new ExpressionStatementNode(expr));
-            }
+            std::vector<StatementNode*> statements = buildStatementList(parseTree->root->children[0].get());
+            program->Statements = statements;
         }
         
         return program;
@@ -179,7 +177,13 @@ std::vector<StatementNode*> ASTBuilder::buildStatementList(ParseNode* node) {
 StatementNode* ASTBuilder::buildStatement(ParseNode* node) {
     if (!node || node->children.empty()) return nullptr;
     
-    // Check first child to determine statement type
+    // New grammar: Statement -> Expression SEMICOLON
+    if (node->children.size() >= 2 && node->children[1]->symbol.value == "SEMICOLON") {
+        ExpressionNode* expr = buildExpression(node->children[0].get());
+        return new ExpressionStatementNode(expr);
+    }
+    
+    // Check first child to determine statement type (for other statement types)
     ParseNode* firstChild = node->children[0].get();
     
     if (firstChild->symbol.value == "FunctionDef") {
