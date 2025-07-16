@@ -143,6 +143,9 @@ build/%.o: src/%.cpp | $(BUILD_DIR)
 
 # Execute the compiled program
 execute: $(TARGET)
+	@echo "--- Updating input files in hulk directory ---"
+	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
+	@cp grammar.txt hulk/ 2>/dev/null || echo "No grammar file to copy"
 	@echo "--- Running Hulk Compiler with Custom Lexer and Parser ---"
 	@cd hulk && \
 	    echo "Step 1: Generating LLVM IR (./hulk_compiler.exe $(INPUT_FILE) -> output.ll)..." && \
