@@ -114,7 +114,7 @@ $(TARGET): $(HULK_DIR) $(OBJECTS) $(MAIN_OBJECT)
 	$(CXX) $(CXXFLAGS) $(LLVM_CXXFLAGS) -o $@ $(OBJECTS) $(MAIN_OBJECT) $(LLVM_LDFLAGS)
 	@echo "Copying additional artifacts to hulk/"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
-	@cp grammar.txt hulk/ 2>/dev/null || echo "No grammar file to copy"
+	@cp -r grammars hulk/ 2>/dev/null || echo "No grammars directory to copy"
 	@echo "Hulk compiler with custom lexer and parser built successfully in hulk/"
 
 # Create hulk directory
@@ -146,7 +146,7 @@ build/%.o: src/%.cpp | $(BUILD_DIR)
 execute: $(TARGET)
 	@echo "--- Updating input files in hulk directory ---"
 	@cp $(INPUT_FILE) hulk/ 2>/dev/null || echo "No input file to copy"
-	@cp grammar.txt hulk/ 2>/dev/null || echo "No grammar file to copy"
+	@cp -r grammars hulk/ 2>/dev/null || echo "No grammars directory to copy"
 	@echo "--- Running Hulk Compiler with Custom Lexer and Parser ---"
 	@cd hulk && \
 	    echo "Step 1: Generating LLVM IR (./hulk_compiler.exe $(INPUT_FILE) -> output.ll)..." && \

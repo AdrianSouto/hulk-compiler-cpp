@@ -5,7 +5,7 @@ namespace Parser {
 
 Parser::Parser() {
     try {
-        grammar = LL1Parser::loadFromFile("grammar.txt");
+        grammar = LL1Parser::loadFromFile("grammars");
         if (!grammar.isLL1()) {
             errors.push_back("Warning: Grammar is not LL(1), parsing may fail");
             auto conflicts = grammar.getConflicts();

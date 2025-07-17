@@ -12,52 +12,69 @@ namespace Parser {
 // STATIC LOADING METHOD
 // ============================================================================
 
-LL1Parser LL1Parser::loadFromFile(const std::string& filename) {
+LL1Parser LL1Parser::loadFromFile(const std::string& grammarDir) {
     LL1Parser parser;
-    parser.loadGrammarFromFile(filename);
+    parser.loadGrammarFromDirectory(grammarDir);
     parser.initializeGrammar();
     return parser;
 }
 
-void LL1Parser::loadGrammarFromFile(const std::string& filename) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        throw std::runtime_error("Cannot open grammar file: " + filename);
-    }
-
-    std::string line;
-    bool readingProductions = false;
-
-    while (std::getline(file, line)) {
-        line = ParserUtils::trim(line);
-        if (line.empty() || line[0] == '#') continue;
-
-        if (line.find("Terminals:") == 0) {
-            parseSymbolList(line.substr(10), terminals);
-        }
-        else if (line.find("NonTerminals:") == 0) {
-            parseSymbolList(line.substr(13), nonTerminals);
-        }
-        else if (line.find("Productions:") == 0) {
-            readingProductions = true;
-        }
-        else if (readingProductions) {
-            parseProduction(line);
-        }
-    }
+void LL1Parser::loadGrammarFromDirectory(const std::string& grammarDir) {
+    // Load terminals from terminals.txt
+    loadTerminals(grammarDir + "/terminals.txt");
+    
+    // Load non-terminals from nonterminals.txt
+    loadNonTerminals(grammarDir + "/nonterminals.txt");
+    
+    // Load productions from productions.txt
+    loadProductions(grammarDir + "/productions.txt");
 
     if (!productions.empty()) {
         startSymbol = productions[0].left;
     }
 }
 
-void LL1Parser::parseSymbolList(const std::string& symbolsStr, std::unordered_set<std::string>& symbolSet) {
-    std::istringstream iss(ParserUtils::trim(symbolsStr));
-    std::string symbol;
-    while (std::getline(iss, symbol, ',')) {
-        symbol = ParserUtils::trim(symbol);
-        if (!symbol.empty()) {
-            symbolSet.insert(symbol);
+void LL1Parser::loadTerminals(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open terminals file: " + filename);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        line = ParserUtils::trim(line);
+        if (!line.empty() && line[0] != '#') {
+            terminals.insert(line);
+        }
+    }
+}
+
+void LL1Parser::loadNonTerminals(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open non-terminals file: " + filename);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        line = ParserUtils::trim(line);
+        if (!line.empty() && line[0] != '#') {
+            nonTerminals.insert(line);
+        }
+    }
+}
+
+void LL1Parser::loadProductions(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open productions file: " + filename);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        line = ParserUtils::trim(line);
+        if (!line.empty() && line[0] != '#') {
+            parseProduction(line);
         }
     }
 }

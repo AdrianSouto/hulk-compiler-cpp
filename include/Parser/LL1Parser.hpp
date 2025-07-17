@@ -32,12 +32,14 @@ public:
     // Constructor
     LL1Parser() = default;
 
-    // Load grammar from file
-    static LL1Parser loadFromFile(const std::string& filename);
+    // Load grammar from directory
+    static LL1Parser loadFromFile(const std::string& grammarDir);
 
     // Grammar loading methods
-    void loadGrammarFromFile(const std::string& filename);
-    void parseSymbolList(const std::string& symbolsStr, std::unordered_set<std::string>& symbolSet);
+    void loadGrammarFromDirectory(const std::string& grammarDir);
+    void loadTerminals(const std::string& filename);
+    void loadNonTerminals(const std::string& filename);
+    void loadProductions(const std::string& filename);
     void parseProduction(const std::string& prodLine);
 
     // FIRST and FOLLOW calculation methods
