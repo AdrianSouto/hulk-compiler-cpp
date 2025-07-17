@@ -111,7 +111,7 @@ FunctionCallTail -> ε
 MemberAccessTail -> DOT IDENTIFIER FunctionCallTail MemberAccessTail
 MemberAccessTail -> ε
 
-DestructiveExpressionTail -> EQUALS Expression
+DestructiveExpressionTail -> ASSIGN Expression
 DestructiveExpressionTail -> ε
 
 VarDeclaration -> LET AssignmentList IN ExpressionBody
@@ -124,7 +124,7 @@ AssignmentList -> AssignmentDecl AssignmentListTail
 AssignmentListTail -> COMMA AssignmentDecl AssignmentListTail
 AssignmentListTail -> ε
 
-AssignmentDecl -> IDENTIFIER TypeAnnotationOpt ASSIGN Expression
+AssignmentDecl -> IDENTIFIER TypeAnnotationOpt EQUALS Expression
 
 IfExpression -> IF LPAREN Expression RPAREN ExpressionBody ElifList ELSE ExpressionBody
 
@@ -153,5 +153,5 @@ MemberListTail -> ε
 
 Member -> IDENTIFIER TypeAnnotationOpt MemberTail SEMICOLON
 
-MemberTail -> ASSIGN Expression
+MemberTail -> EQUALS Expression
 MemberTail -> LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
