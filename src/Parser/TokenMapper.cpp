@@ -3,22 +3,8 @@
 namespace Parser {
 
 std::string TokenMapper::getTerminalFromToken(const Token& token) const {
-    // Use cache for performance
-    auto it = tokenSymbolCache.find(static_cast<int>(token.type));
-    if (it != tokenSymbolCache.end()) {
-        return it->second;
-    }
-
     // Map token type to terminal symbol
-    std::string result = mapTokenTypeToString(token.type);
-
-    // Cache the result
-    tokenSymbolCache[static_cast<int>(token.type)] = result;
-    return result;
-}
-
-void TokenMapper::clearCache() {
-    tokenSymbolCache.clear();
+    return mapTokenTypeToString(token.type);
 }
 
 std::string TokenMapper::mapTokenTypeToString(TokenType tokenType) const {
