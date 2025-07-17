@@ -47,15 +47,12 @@ std::unique_ptr<ParseTree> Parser::parse(const std::vector<Token>& tokens) {
     }
 }
 
-void Parser::printParseTree(const std::vector<Token>& tokens) const {
-    // Create a temporary parser instance to avoid modifying const state
-    Parser tempParser;
-    
-    auto parseTree = tempParser.parse(tokens);
+void Parser::printParseTree(const std::vector<Token>& tokens) {
+    auto parseTree = parse(tokens);
 
     if (!parseTree) {
         std::cout << "Failed to create parse tree:" << std::endl;
-        for (const auto& error : tempParser.getErrors()) {
+        for (const auto& error : getErrors()) {
             std::cout << "  " << error << std::endl;
         }
         return;

@@ -3,20 +3,22 @@
 
 namespace Parser {
 
-static void printNode(const ParseNode* node, int depth);
+static void printNode(const ParseNode* node, int depth, bool isLast = true, std::string prefix = "");
 
 void ParseTree::print(int depth) const {
     if (!root) return;
     
-    printNode(root.get(), depth);
+    std::cout << "Parse Tree:" << std::endl;
+    printNode(root.get(), 0, true, "");
 }
 
-static void printNode(const ParseNode* node, int depth) {
+static void printNode(const ParseNode* node, int depth, bool isLast, std::string prefix) {
     if (!node) return;
     
-    // Print indentation
-    for (int i = 0; i < depth; ++i) {
-        std::cout << "  ";
+    // Print current node with tree structure using ASCII characters
+    std::cout << prefix;
+    if (depth > 0) {
+        std::cout << (isLast ? "+-- " : "|-- ");
     }
     
     // Print node value
@@ -29,9 +31,16 @@ static void printNode(const ParseNode* node, int depth) {
     
     std::cout << std::endl;
     
-    // Print children
-    for (const auto& child : node->children) {
-        printNode(child.get(), depth + 1);
+    // Print children with proper tree structure
+    for (size_t i = 0; i < node->children.size(); ++i) {
+        bool childIsLast = (i == node->children.size() - 1);
+        std::string childPrefix = prefix;
+
+        if (depth > 0) {
+            childPrefix += (isLast ? "    " : "|   ");
+        }
+
+        printNode(node->children[i].get(), depth + 1, childIsLast, childPrefix);
     }
 }
 
