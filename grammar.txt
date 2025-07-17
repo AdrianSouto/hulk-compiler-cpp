@@ -9,7 +9,6 @@ StatementList -> Statement StatementList
 StatementList -> ε
 
 Statement -> Expression SEMICOLON
-Statement -> Block SEMICOLON
 Statement -> FunctionDef SEMICOLON
 Statement -> TypeDef SEMICOLON
 
@@ -120,7 +119,6 @@ DestructiveExpressionTail -> ε
 VarDeclaration -> LET AssignmentList IN ExpressionBody
 
 ExpressionBody -> Expression
-ExpressionBody -> Block
 
 AssignmentList -> AssignmentDecl AssignmentListTail
 
