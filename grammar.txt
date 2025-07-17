@@ -1,6 +1,6 @@
 Terminals: FUNCTION, TYPE, INHERITS, NEW, BASE, IF, ELIF, ELSE, WHILE, FOR, IN, IS, AS, LET, PRINT, TRUE, FALSE, TYPE_NUMBER, TYPE_STRING, TYPE_BOOLEAN, IDENTIFIER, NUMBER, STRING, LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON, COMMA, COLON, DOT, PLUS, MINUS, MULTIPLY, DIVIDE, MODULO, POWER, CONCAT, CONCAT_SPACE, EQUALS, ASSIGN, EQEQ, NOTEQ, LESS, LESSEQ, GREATER, GREATEREQ, AND, OR, NOT, ARROW, EOF
 
-NonTerminals: Program, StatementList, Statement, Expression, OrExpression, OrExpressionTail, AndExpression, AndExpressionTail, EqualityExpression, EqualityExpressionTail, RelationalExpression, RelationalExpressionTail, AdditiveExpression, AdditiveExpressionTail, MultiplicativeExpression, MultiplicativeExpressionTail, PowerExpression, PowerExpressionTail, UnaryExpression, Atom
+NonTerminals: Program, StatementList, Statement, Expression, BooleanExpression, BooleanExpressionTail, BooleanTerm, BooleanTermTail, BooleanFactor, RelationalExpression, RelationalExpressionTail, AdditiveExpression, AdditiveExpressionTail, MultiplicativeExpression, MultiplicativeExpressionTail, PowerExpression, PowerExpressionTail, Primary, FunctionDef, ParameterList, ParameterListTail, FunctionBody, Block, ExpressionList, ExpressionListTail, ArgumentList, ArgumentListTail, TypeAnnotationOpt, FunctionCallTail, MemberAccessTail, VarDeclaration, AssignmentList, AssignmentListTail, AssignmentDecl, ExpressionBody, IfExpression, ElifList, WhileLoop, ForLoop, TypeInstantiation, TypeDef, MemberList, MemberListTail, Member, MemberTail, InheritsExp, ArgTypeOpt, DestructiveExpressionTail, TypeName
 
 Productions:
 Program -> StatementList
@@ -9,27 +9,34 @@ StatementList -> Statement StatementList
 StatementList -> ε
 
 Statement -> Expression SEMICOLON
+Statement -> Block SEMICOLON
+Statement -> FunctionDef SEMICOLON
+Statement -> TypeDef SEMICOLON
 
-Expression -> OrExpression
+Expression -> BooleanExpression DestructiveExpressionTail
+Expression -> VarDeclaration
+Expression -> IfExpression
+Expression -> WhileLoop
+Expression -> ForLoop
+Expression -> TypeInstantiation
 
-OrExpression -> AndExpression OrExpressionTail
+BooleanExpression -> BooleanTerm BooleanExpressionTail
 
-OrExpressionTail -> OR AndExpression OrExpressionTail
-OrExpressionTail -> ε
+BooleanExpressionTail -> OR BooleanTerm BooleanExpressionTail
+BooleanExpressionTail -> ε
 
-AndExpression -> EqualityExpression AndExpressionTail
+BooleanTerm -> BooleanFactor BooleanTermTail
 
-AndExpressionTail -> AND EqualityExpression AndExpressionTail
-AndExpressionTail -> ε
+BooleanTermTail -> AND BooleanFactor BooleanTermTail
+BooleanTermTail -> ε
 
-EqualityExpression -> RelationalExpression EqualityExpressionTail
-
-EqualityExpressionTail -> EQEQ RelationalExpression EqualityExpressionTail
-EqualityExpressionTail -> NOTEQ RelationalExpression EqualityExpressionTail
-EqualityExpressionTail -> ε
+BooleanFactor -> NOT BooleanFactor
+BooleanFactor -> RelationalExpression
 
 RelationalExpression -> AdditiveExpression RelationalExpressionTail
 
+RelationalExpressionTail -> EQEQ AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> NOTEQ AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> LESS AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> LESSEQ AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> GREATER AdditiveExpression RelationalExpressionTail
@@ -51,19 +58,100 @@ MultiplicativeExpressionTail -> DIVIDE PowerExpression MultiplicativeExpressionT
 MultiplicativeExpressionTail -> MODULO PowerExpression MultiplicativeExpressionTail
 MultiplicativeExpressionTail -> ε
 
-PowerExpression -> UnaryExpression PowerExpressionTail
+PowerExpression -> Primary PowerExpressionTail
 
-PowerExpressionTail -> POWER UnaryExpression PowerExpressionTail
+PowerExpressionTail -> POWER Primary PowerExpressionTail
 PowerExpressionTail -> ε
 
-UnaryExpression -> MINUS UnaryExpression
-UnaryExpression -> NOT UnaryExpression
-UnaryExpression -> Atom
+Primary -> LPAREN Expression RPAREN
+Primary -> NUMBER
+Primary -> STRING
+Primary -> TRUE
+Primary -> FALSE
+Primary -> IDENTIFIER FunctionCallTail MemberAccessTail
+Primary -> PRINT LPAREN Expression RPAREN
+Primary -> Block
 
-Atom -> NUMBER
-Atom -> STRING
-Atom -> TRUE
-Atom -> FALSE
-Atom -> IDENTIFIER
-Atom -> LPAREN Expression RPAREN
-Atom -> PRINT LPAREN Expression RPAREN
+FunctionDef -> FUNCTION IDENTIFIER LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
+
+FunctionBody -> ARROW Expression
+FunctionBody -> Block
+FunctionBody -> ε
+
+ParameterList -> IDENTIFIER TypeAnnotationOpt ParameterListTail
+ParameterList -> ε
+
+ParameterListTail -> COMMA IDENTIFIER TypeAnnotationOpt ParameterListTail
+ParameterListTail -> ε
+
+TypeAnnotationOpt -> COLON TypeName
+TypeAnnotationOpt -> ε
+
+TypeName -> IDENTIFIER
+TypeName -> TYPE_NUMBER
+TypeName -> TYPE_STRING
+TypeName -> TYPE_BOOLEAN
+
+Block -> LBRACE ExpressionList RBRACE
+
+ExpressionList -> Expression SEMICOLON ExpressionListTail
+
+ExpressionListTail -> Expression SEMICOLON ExpressionListTail
+ExpressionListTail -> ε
+
+ArgumentList -> Expression ArgumentListTail
+ArgumentList -> ε
+
+ArgumentListTail -> COMMA Expression ArgumentListTail
+ArgumentListTail -> ε
+
+FunctionCallTail -> LPAREN ArgumentList RPAREN
+FunctionCallTail -> ε
+
+MemberAccessTail -> DOT IDENTIFIER FunctionCallTail MemberAccessTail
+MemberAccessTail -> ε
+
+DestructiveExpressionTail -> EQUALS Expression
+DestructiveExpressionTail -> ε
+
+VarDeclaration -> LET AssignmentList IN ExpressionBody
+
+ExpressionBody -> Expression
+ExpressionBody -> Block
+
+AssignmentList -> AssignmentDecl AssignmentListTail
+
+AssignmentListTail -> COMMA AssignmentDecl AssignmentListTail
+AssignmentListTail -> ε
+
+AssignmentDecl -> IDENTIFIER TypeAnnotationOpt ASSIGN Expression
+
+IfExpression -> IF LPAREN Expression RPAREN ExpressionBody ElifList ELSE ExpressionBody
+
+ElifList -> ELIF LPAREN Expression RPAREN ExpressionBody ElifList
+ElifList -> ε
+
+WhileLoop -> WHILE LPAREN Expression RPAREN ExpressionBody
+
+ForLoop -> FOR LPAREN IDENTIFIER IN Expression RPAREN ExpressionBody
+
+TypeInstantiation -> NEW IDENTIFIER FunctionCallTail
+
+TypeDef -> TYPE IDENTIFIER ArgTypeOpt InheritsExp LBRACE MemberList RBRACE
+
+InheritsExp -> INHERITS IDENTIFIER ArgTypeOpt
+InheritsExp -> ε
+
+ArgTypeOpt -> LPAREN ParameterList RPAREN
+ArgTypeOpt -> ε
+
+MemberList -> Member MemberListTail
+MemberList -> ε
+
+MemberListTail -> Member MemberListTail
+MemberListTail -> ε
+
+Member -> IDENTIFIER TypeAnnotationOpt MemberTail SEMICOLON
+
+MemberTail -> ASSIGN Expression
+MemberTail -> LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
