@@ -1,0 +1,106 @@
+# HULK Language Production Rules
+# Compatible with existing AST builder
+
+Program -> StmtList EOF
+StmtList -> Stmt StmtList
+StmtList -> epsilon
+Stmt -> Expr SEMICOLON
+Stmt -> FuncDef SEMICOLON
+Stmt -> TypeDef SEMICOLON
+Expr -> VarDecl
+Expr -> IfExpr
+Expr -> WhileLoop
+Expr -> ForLoop
+Expr -> TypeInst
+Expr -> LogicalOr AssignmentTail
+AssignmentTail -> ASSIGN Expr
+AssignmentTail -> epsilon
+LogicalOr -> LogicalAnd LogicalOrRest
+LogicalOrRest -> OR LogicalAnd LogicalOrRest
+LogicalOrRest -> epsilon
+LogicalAnd -> Equality LogicalAndRest
+LogicalAndRest -> AND Equality LogicalAndRest
+LogicalAndRest -> epsilon
+Equality -> Relational EqualityRest
+EqualityRest -> EQEQ Relational EqualityRest
+EqualityRest -> NOTEQ Relational EqualityRest
+EqualityRest -> epsilon
+Relational -> Additive RelationalRest
+RelationalRest -> LESS Additive RelationalRest
+RelationalRest -> LESSEQ Additive RelationalRest
+RelationalRest -> GREATER Additive RelationalRest
+RelationalRest -> GREATEREQ Additive RelationalRest
+RelationalRest -> IS TypeName
+RelationalRest -> AS TypeName
+RelationalRest -> epsilon
+Additive -> Multiplicative AdditiveRest
+AdditiveRest -> PLUS Multiplicative AdditiveRest
+AdditiveRest -> MINUS Multiplicative AdditiveRest
+AdditiveRest -> CONCAT Multiplicative AdditiveRest
+AdditiveRest -> CONCAT_SPACE Multiplicative AdditiveRest
+AdditiveRest -> epsilon
+Multiplicative -> Power MultiplicativeRest
+MultiplicativeRest -> MULTIPLY Power MultiplicativeRest
+MultiplicativeRest -> DIVIDE Power MultiplicativeRest
+MultiplicativeRest -> MODULO Power MultiplicativeRest
+MultiplicativeRest -> epsilon
+Power -> Unary PowerRest
+PowerRest -> POWER Unary PowerRest
+PowerRest -> epsilon
+Unary -> NOT Unary
+Unary -> MINUS Unary
+Unary -> Primary
+Primary -> LPAREN Expr RPAREN
+Primary -> NUMBER
+Primary -> STRING
+Primary -> TRUE
+Primary -> FALSE
+Primary -> IDENTIFIER AccessChain
+Primary -> PRINT LPAREN Expr RPAREN
+Primary -> Block
+Primary -> BASE AccessChain
+AccessChain -> LPAREN ArgList RPAREN AccessChain
+AccessChain -> DOT IDENTIFIER AccessChain
+AccessChain -> epsilon
+FuncDef -> FUNCTION IDENTIFIER LPAREN ParamList RPAREN TypeAnnotationOpt FuncBody
+FuncBody -> ARROW Expr
+FuncBody -> Block
+ParamList -> IDENTIFIER TypeAnnotationOpt ParamRest
+ParamList -> epsilon
+ParamRest -> COMMA IDENTIFIER TypeAnnotationOpt ParamRest
+ParamRest -> epsilon
+Block -> LBRACE ExprList RBRACE
+ExprList -> Expr SEMICOLON ExprList
+ExprList -> epsilon
+ArgList -> Expr ArgRest
+ArgList -> epsilon
+ArgRest -> COMMA Expr ArgRest
+ArgRest -> epsilon
+VarDecl -> LET AssignmentList IN Expr
+AssignmentList -> AssignmentDecl AssignmentRest
+AssignmentRest -> COMMA AssignmentDecl AssignmentRest
+AssignmentRest -> epsilon
+AssignmentDecl -> IDENTIFIER TypeAnnotationOpt EQUALS Expr
+IfExpr -> IF LPAREN Expr RPAREN Expr ElifList ELSE Expr
+ElifList -> ELIF LPAREN Expr RPAREN Expr ElifList
+ElifList -> epsilon
+WhileLoop -> WHILE LPAREN Expr RPAREN Expr
+ForLoop -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
+TypeInst -> NEW IDENTIFIER LPAREN ArgList RPAREN
+TypeDef -> TYPE IDENTIFIER TypeParams InheritsClause LBRACE MemberList RBRACE
+TypeParams -> LPAREN ParamList RPAREN
+TypeParams -> epsilon
+TypeAnnotationOpt -> COLON TypeName
+TypeAnnotationOpt -> epsilon
+InheritsClause -> INHERITS IDENTIFIER
+InheritsClause -> epsilon
+MemberList -> Member MemberList
+MemberList -> epsilon
+Member -> IDENTIFIER TypeAnnotationOpt MemberTail SEMICOLON
+MemberTail -> EQUALS Expr
+MemberTail -> LPAREN ParamList RPAREN TypeAnnotationOpt FuncBody
+MemberTail -> epsilon
+TypeName -> IDENTIFIER
+TypeName -> TYPE_NUMBER
+TypeName -> TYPE_STRING
+TypeName -> TYPE_BOOLEAN
