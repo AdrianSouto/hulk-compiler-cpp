@@ -83,7 +83,6 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Lexer/RegexParser.cpp \
               src/Lexer/Lexer.cpp \
               src/Parser/ParseTree.cpp \
-              src/Parser/GrammarLoader.cpp \
               src/Parser/TokenMapper.cpp \
               src/Parser/ParserUtils.cpp \
               src/Parser/LL1Parser.cpp \

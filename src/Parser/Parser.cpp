@@ -1,15 +1,11 @@
 #include "Parser/Parser.hpp"
 #include <iostream>
-#include <sstream>
 
 namespace Parser {
 
 Parser::Parser() {
     try {
-        // Load grammar from file
         grammar = LL1Parser::loadFromFile("grammar.txt");
-
-        // Check if grammar is LL(1)
         if (!grammar.isLL1()) {
             errors.push_back("Warning: Grammar is not LL(1), parsing may fail");
             auto conflicts = grammar.getConflicts();
@@ -24,23 +20,10 @@ Parser::Parser() {
 
 std::unique_ptr<ParseTree> Parser::parse(const std::vector<Token>& tokens) {
     clearErrors();
-    
-    if (!errors.empty()) {
-        // Grammar loading failed
-        return nullptr;
-    }
+    if (!errors.empty()) return nullptr;
     
     try {
-        // Parse tokens into parse tree
-        auto parseTree = grammar.parse(tokens);
-        
-        if (!parseTree) {
-            errors.push_back("Failed to build parse tree");
-            return nullptr;
-        }
-        
-        return parseTree;
-        
+        return grammar.parse(tokens);
     } catch (const std::exception& e) {
         errors.push_back(e.what());
         return nullptr;

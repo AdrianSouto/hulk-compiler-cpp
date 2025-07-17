@@ -8,7 +8,6 @@
 #include "Symbol.hpp"
 #include "ParseTree.hpp"
 #include "Lexer/Token.hpp"
-#include "GrammarLoader.hpp"
 #include "TokenMapper.hpp"
 #include "ParserUtils.hpp"
 
@@ -28,14 +27,18 @@ public:
     std::unordered_map<std::string, std::unordered_map<std::string, size_t>> parsingTable;
     
     // Helper components
-    GrammarLoader grammarLoader;
     TokenMapper tokenMapper;
 
     // Constructor
     LL1Parser() = default;
 
-    // Load grammar from file using GrammarLoader
+    // Load grammar from file
     static LL1Parser loadFromFile(const std::string& filename);
+
+    // Grammar loading methods
+    void loadGrammarFromFile(const std::string& filename);
+    void parseSymbolList(const std::string& symbolsStr, std::unordered_set<std::string>& symbolSet);
+    void parseProduction(const std::string& prodLine);
 
     // FIRST and FOLLOW calculation methods
     void calculateFirst();
@@ -73,10 +76,6 @@ public:
     void printFirst() const;
     void printFollow() const;
     void printParsingTable() const;
-
-private:
-    // Initialize grammar data from loader
-    void copyFromLoader(const GrammarLoader& loader);
 };
 
 } // namespace Parser

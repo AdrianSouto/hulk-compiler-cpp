@@ -3,6 +3,8 @@
 #include <iostream>
 #include <stack>
 #include <stdexcept>
+#include <fstream>
+#include <sstream>
 
 namespace Parser {
 
@@ -12,14 +14,83 @@ namespace Parser {
 
 LL1Parser LL1Parser::loadFromFile(const std::string& filename) {
     LL1Parser parser;
+    parser.loadGrammarFromFile(filename);
+    parser.initializeGrammar();
+    return parser;
+}
 
-    // Use GrammarLoader to load grammar data
-    if (parser.grammarLoader.loadFromFile(filename)) {
-        parser.copyFromLoader(parser.grammarLoader);
-        parser.initializeGrammar();
+void LL1Parser::loadGrammarFromFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open grammar file: " + filename);
     }
 
-    return parser;
+    std::string line;
+    bool readingProductions = false;
+
+    while (std::getline(file, line)) {
+        line = ParserUtils::trim(line);
+        if (line.empty() || line[0] == '#') continue;
+
+        if (line.find("Terminals:") == 0) {
+            parseSymbolList(line.substr(10), terminals);
+        }
+        else if (line.find("NonTerminals:") == 0) {
+            parseSymbolList(line.substr(13), nonTerminals);
+        }
+        else if (line.find("Productions:") == 0) {
+            readingProductions = true;
+        }
+        else if (readingProductions) {
+            parseProduction(line);
+        }
+    }
+
+    if (!productions.empty()) {
+        startSymbol = productions[0].left;
+    }
+}
+
+void LL1Parser::parseSymbolList(const std::string& symbolsStr, std::unordered_set<std::string>& symbolSet) {
+    std::istringstream iss(ParserUtils::trim(symbolsStr));
+    std::string symbol;
+    while (std::getline(iss, symbol, ',')) {
+        symbol = ParserUtils::trim(symbol);
+        if (!symbol.empty()) {
+            symbolSet.insert(symbol);
+        }
+    }
+}
+
+void LL1Parser::parseProduction(const std::string& prodLine) {
+    size_t arrowPos = prodLine.find("->");
+    if (arrowPos == std::string::npos) return;
+
+    std::string lhsStr = ParserUtils::trim(prodLine.substr(0, arrowPos));
+    Symbol lhsSymbol(lhsStr, SymbolType::NonTerminal);
+    std::string rhsStr = ParserUtils::trim(prodLine.substr(arrowPos + 2));
+
+    // Split alternatives by '|'
+    std::istringstream altStream(rhsStr);
+    std::string alt;
+    while (std::getline(altStream, alt, '|')) {
+        alt = ParserUtils::trim(alt);
+        std::vector<Symbol> rhsSymbols;
+        
+        if (alt != "ε" && !alt.empty()) {
+            std::istringstream tokenStream(alt);
+            std::string token;
+            while (tokenStream >> token) {
+                if (token != "ε") {
+                    SymbolType type = (nonTerminals.find(token) != nonTerminals.end()) 
+                                    ? SymbolType::NonTerminal : SymbolType::Terminal;
+                    rhsSymbols.push_back(Symbol(token, type));
+                }
+            }
+        }
+        
+        productions.push_back(Production(lhsSymbol, rhsSymbols));
+    }
 }
 
 // ============================================================================
@@ -298,17 +369,6 @@ void LL1Parser::printFollow() const {
 
 void LL1Parser::printParsingTable() const {
     ParserUtils::printParsingTable(parsingTable);
-}
-
-// ============================================================================
-// PRIVATE HELPER METHODS
-// ============================================================================
-
-void LL1Parser::copyFromLoader(const GrammarLoader& loader) {
-    terminals = loader.terminals;
-    nonTerminals = loader.nonTerminals;
-    productions = loader.productions;
-    startSymbol = loader.startSymbol;
 }
 
 } // namespace Parser
