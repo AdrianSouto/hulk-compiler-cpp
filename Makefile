@@ -87,7 +87,6 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Parser/TokenMapper.cpp \
               src/Parser/ParserUtils.cpp \
               src/Parser/LL1Parser.cpp \
-              src/Parser/ASTBuilder.cpp \
               src/Parser/Parser.cpp
 
 MAIN_SOURCE = main_new.cpp
