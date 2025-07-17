@@ -2,6 +2,8 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <memory>
 #include <stack>
@@ -14,15 +16,19 @@ namespace Parser {
 
 class Grammar {
 private:
+    // Core grammar data - using more efficient containers
     Symbol startSymbol;
-    std::set<Symbol> terminals;
-    std::set<Symbol> nonTerminals;
+    std::unordered_set<std::string> terminals;
+    std::unordered_set<std::string> nonTerminals;
     std::vector<Production> productions;
     
-    // LL(1) parsing tables
-    std::map<Symbol, std::set<Symbol>> firstSets;
-    std::map<Symbol, std::set<Symbol>> followSets;
-    std::map<Symbol, std::map<Symbol, int>> parsingTable;
+    // LL(1) parsing tables - using hash maps for better performance
+    std::unordered_map<std::string, std::unordered_set<std::string>> firstSets;
+    std::unordered_map<std::string, std::unordered_set<std::string>> followSets;
+    std::unordered_map<std::string, std::unordered_map<std::string, size_t>> parsingTable;
+    
+    // Cache for token to symbol mapping for performance
+    mutable std::unordered_map<int, std::string> tokenSymbolCache;
 
     // Grammar loading helper methods
     void parseGrammarFile(std::ifstream& file, std::vector<std::string>& productionLines);
@@ -42,7 +48,7 @@ private:
     void computeFirstSetsIteratively();
     void calculateFollow();
     void buildParsingTable();
-    std::set<Symbol> computeFirst(const std::vector<Symbol>& symbols) const;
+    std::unordered_set<std::string> computeFirst(const std::vector<Symbol>& symbols) const;
 
     // Parsing helper methods
     void initializeParsingStack(std::stack<ParseNode*>& stack, ParseNode* root);
@@ -51,22 +57,22 @@ private:
     void processTerminal(ParseNode* node, const std::vector<Token>& tokens, 
                         size_t& tokenIndex, std::stack<ParseNode*>& stack);
     Token getLookaheadToken(const std::vector<Token>& tokens, size_t index) const;
-    int findProductionInTable(const Symbol& nonTerminal, const Symbol& terminal, 
-                             const Token& lookahead) const;
+    size_t findProductionInTable(const std::string& nonTerminal, const std::string& terminal, 
+                                const Token& lookahead) const;
     void expandNonTerminal(ParseNode* node, const Production& prod, 
                           std::stack<ParseNode*>& stack);
     void validateParsingCompletion(const std::vector<Token>& tokens, size_t tokenIndex) const;
     
     // Error handling methods
     void throwUnexpectedTokenError(const Token& lookahead) const;
-    void throwTerminalMismatchError(const Symbol& expected, const Token& found) const;
+    void throwTerminalMismatchError(const std::string& expected, const Token& found) const;
     
     // Utility methods
     static std::string trim(const std::string& str);
-    Symbol getTerminalFromToken(const Token& token) const;
+    std::string getTerminalFromToken(const Token& token) const;
 
 public:
-    Grammar() {}
+    Grammar() = default;
     
     // Load grammar from file
     static Grammar loadFromFile(const std::string& filename);
