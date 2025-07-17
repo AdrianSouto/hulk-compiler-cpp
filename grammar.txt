@@ -41,6 +41,8 @@ RelationalExpressionTail -> LESS AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> LESSEQ AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> GREATER AdditiveExpression RelationalExpressionTail
 RelationalExpressionTail -> GREATEREQ AdditiveExpression RelationalExpressionTail
+RelationalExpressionTail -> IS TypeName RelationalExpressionTail
+RelationalExpressionTail -> AS TypeName RelationalExpressionTail
 RelationalExpressionTail -> ε
 
 AdditiveExpression -> MultiplicativeExpression AdditiveExpressionTail
@@ -70,6 +72,7 @@ Primary -> TRUE
 Primary -> FALSE
 Primary -> IDENTIFIER FunctionCallTail MemberAccessTail
 Primary -> PRINT LPAREN Expression RPAREN
+Primary -> BASE FunctionCallTail
 Primary -> Block
 
 FunctionDef -> FUNCTION IDENTIFIER LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
