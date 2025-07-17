@@ -15,7 +15,7 @@ public:
     std::string value;
     SymbolType type;
 
-    Symbol() : value("ε"), type(SymbolType::Epsilon) {}
+    Symbol() : value("epsilon"), type(SymbolType::Epsilon) {}
     Symbol(const std::string& val, SymbolType t) : value(val), type(t) {}
 
     bool operator<(const Symbol& other) const {

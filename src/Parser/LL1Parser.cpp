@@ -94,11 +94,11 @@ void LL1Parser::parseProduction(const std::string& prodLine) {
         alt = ParserUtils::trim(alt);
         std::vector<Symbol> rhsSymbols;
         
-        if (alt != "ε" && !alt.empty()) {
+        if (alt != "epsilon" && !alt.empty()) {
             std::istringstream tokenStream(alt);
             std::string token;
             while (tokenStream >> token) {
-                if (token != "ε") {
+                if (token != "epsilon") {
                     SymbolType type = (nonTerminals.find(token) != nonTerminals.end()) 
                                     ? SymbolType::NonTerminal : SymbolType::Terminal;
                     rhsSymbols.push_back(Symbol(token, type));
@@ -131,7 +131,7 @@ void LL1Parser::initializeFirstSets() {
     }
 
     // Add epsilon to its own FIRST set
-    firstSets["ε"].insert("ε");
+    firstSets["epsilon"].insert("epsilon");
 }
 
 void LL1Parser::computeFirstSetsIteratively() {
@@ -185,15 +185,15 @@ void LL1Parser::calculateFollow() {
 
                 size_t beforeSize = followSets[B.value].size();
 
-                // Add FIRST(β) - {ε} to FOLLOW(B)
+                // Add FIRST(β) - {epsilon} to FOLLOW(B)
                 for (const auto& symbol : firstBeta) {
-                    if (symbol != "ε") {
+                    if (symbol != "epsilon") {
                         followSets[B.value].insert(symbol);
                     }
                 }
 
-                // If β can derive ε or B is at the end, add FOLLOW(A) to FOLLOW(B)
-                if (firstBeta.find("ε") != firstBeta.end() || i == alpha.size() - 1) {
+                // If β can derive epsilon or B is at the end, add FOLLOW(A) to FOLLOW(B)
+                if (firstBeta.find("epsilon") != firstBeta.end() || i == alpha.size() - 1) {
                     followSets[B.value].insert(followSets[A].begin(), followSets[A].end());
                 }
 
@@ -213,9 +213,9 @@ void LL1Parser::buildParsingTable() {
         // Calculate FIRST(α) where α is the RHS
         std::unordered_set<std::string> firstAlpha = ParserUtils::computeFirst(prod.right, firstSets);
 
-        // For each terminal in FIRST(α) - {ε}
+        // For each terminal in FIRST(α) - {epsilon}
         for (const auto& terminal : firstAlpha) {
-            if (terminal != "ε") {
+            if (terminal != "epsilon") {
                 if (parsingTable[A].find(terminal) != parsingTable[A].end()) {
                     // Conflict detected - grammar is not LL(1)
                     std::cerr << "LL(1) conflict at [" << A << ", " << terminal << "]" << std::endl;
@@ -224,8 +224,8 @@ void LL1Parser::buildParsingTable() {
             }
         }
 
-        // If ε is in FIRST(α)
-        if (firstAlpha.find("ε") != firstAlpha.end()) {
+        // If epsilon is in FIRST(α)
+        if (firstAlpha.find("epsilon") != firstAlpha.end()) {
             // For each terminal in FOLLOW(A)
             for (const auto& terminal : followSets[A]) {
                 if (parsingTable[A].find(terminal) != parsingTable[A].end()) {

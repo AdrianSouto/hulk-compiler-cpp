@@ -56,7 +56,7 @@ RegExPtr RegexParser::parseClosure() {
             );
         } else if (c == '?') {
             get();
-            // a? is equivalent to (a|ε)
+            // a? is equivalent to (a|epsilon)
             auto epsilon = std::make_shared<EpsilonRegEx>();
             atom = std::make_shared<UnionRegEx>(atom, epsilon);
         } else {

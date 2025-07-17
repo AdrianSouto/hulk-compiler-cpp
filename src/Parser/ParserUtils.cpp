@@ -19,7 +19,7 @@ std::unordered_set<std::string> ParserUtils::computeFirst(
     std::unordered_set<std::string> result;
 
     if (symbols.empty()) {
-        result.insert("ε");
+        result.insert("epsilon");
         return result;
     }
 
@@ -28,15 +28,15 @@ std::unordered_set<std::string> ParserUtils::computeFirst(
     for (const auto& symbol : symbols) {
         auto it = firstSets.find(symbol.value);
         if (it != firstSets.end()) {
-            // Add FIRST(symbol) - {ε} to result
+            // Add FIRST(symbol) - {epsilon} to result
             for (const auto& s : it->second) {
-                if (s != "ε") {
+                if (s != "epsilon") {
                     result.insert(s);
                 }
             }
 
             // Check if symbol can derive epsilon
-            if (it->second.find("ε") == it->second.end()) {
+            if (it->second.find("epsilon") == it->second.end()) {
                 allCanDeriveEpsilon = false;
                 break;
             }
@@ -49,7 +49,7 @@ std::unordered_set<std::string> ParserUtils::computeFirst(
 
     // If all symbols can derive epsilon, add epsilon to result
     if (allCanDeriveEpsilon) {
-        result.insert("ε");
+        result.insert("epsilon");
     }
 
     return result;
@@ -89,13 +89,13 @@ std::vector<std::string> ParserUtils::findConflicts(
                 std::unordered_set<std::string> firstSet = computeFirst(productions[i].right, firstSets);
 
                 for (const auto& terminal : firstSet) {
-                    if (terminal != "ε") {
+                    if (terminal != "epsilon") {
                         entries[terminal].push_back(i);
                     }
                 }
 
                 // If epsilon is in FIRST, add FOLLOW terminals
-                if (firstSet.find("ε") != firstSet.end()) {
+                if (firstSet.find("epsilon") != firstSet.end()) {
                     auto followIt = followSets.find(nonTerminal);
                     if (followIt != followSets.end()) {
                         for (const auto& terminal : followIt->second) {
