@@ -43,10 +43,6 @@ public:
     static void printParsingTable(
         const std::unordered_map<std::string, std::unordered_map<std::string, size_t>>& parsingTable
     );
-
-private:
-    // Internal helper methods
-    static bool hasConflictInEntry(const std::vector<size_t>& productions);
 };
 
 } // namespace Parser

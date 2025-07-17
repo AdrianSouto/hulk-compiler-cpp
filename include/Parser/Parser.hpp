@@ -26,7 +26,6 @@ public:
     
     // Debug
     void printGrammarInfo() const;
-    void printParseTree(const std::vector<Token>& tokens);
 };
 
 } // namespace Parser

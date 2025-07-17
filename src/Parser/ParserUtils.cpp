@@ -170,8 +170,4 @@ void ParserUtils::printParsingTable(
     }
 }
 
-bool ParserUtils::hasConflictInEntry(const std::vector<size_t>& productions) {
-    return productions.size() > 1;
-}
-
 } // namespace Parser

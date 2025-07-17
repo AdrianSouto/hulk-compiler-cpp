@@ -5,7 +5,7 @@ namespace Parser {
 
 static void printNode(const ParseNode* node, int depth, bool isLast = true, std::string prefix = "");
 
-void ParseTree::print(int depth) const {
+void ParseTree::print() const {
     if (!root) return;
     
     std::cout << "Parse Tree:" << std::endl;

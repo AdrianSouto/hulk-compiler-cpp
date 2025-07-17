@@ -15,6 +15,25 @@ namespace Parser {
 
 class LL1Parser {
 public:
+    // Constructor
+    LL1Parser() = default;
+
+    // Load grammar from directory
+    static LL1Parser loadFromFile(const std::string& grammarDir);
+
+    // Main parsing method
+    std::unique_ptr<ParseTree> parse(const std::vector<Token>& tokens);
+    
+    // Validation methods (using ParserUtils)
+    bool isLL1() const;
+    std::vector<std::string> getConflicts() const;
+    
+    // Debug methods (using ParserUtils)
+    void printFirst() const;
+    void printFollow() const;
+    void printParsingTable() const;
+
+private:
     // Core grammar data - using more efficient containers
     Symbol startSymbol;
     std::unordered_set<std::string> terminals;
@@ -28,12 +47,6 @@ public:
     
     // Helper components
     TokenMapper tokenMapper;
-
-    // Constructor
-    LL1Parser() = default;
-
-    // Load grammar from directory
-    static LL1Parser loadFromFile(const std::string& grammarDir);
 
     // Grammar loading methods
     void loadGrammarFromDirectory(const std::string& grammarDir);
@@ -49,9 +62,6 @@ public:
     void calculateFollow();
     void buildParsingTable();
     void initializeGrammar();
-
-    // Main parsing method
-    std::unique_ptr<ParseTree> parse(const std::vector<Token>& tokens);
 
     // Parsing helper methods (core algorithm)
     void initializeParsingStack(std::stack<ParseNode*>& stack, ParseNode* root);
@@ -69,15 +79,6 @@ public:
     // Error handling methods
     void throwUnexpectedTokenError(const Token& lookahead) const;
     void throwTerminalMismatchError(const std::string& expected, const Token& found) const;
-    
-    // Validation methods (using ParserUtils)
-    bool isLL1() const;
-    std::vector<std::string> getConflicts() const;
-    
-    // Debug methods (using ParserUtils)
-    void printFirst() const;
-    void printFollow() const;
-    void printParsingTable() const;
 };
 
 } // namespace Parser

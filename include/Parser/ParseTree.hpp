@@ -28,7 +28,7 @@ public:
     ParseTree() {}
     ParseTree(std::unique_ptr<ParseNode> r) : root(std::move(r)) {}
 
-    void print(int depth = 0) const;
+    void print() const;
 };
 
 } // namespace Parser

@@ -30,22 +30,6 @@ std::unique_ptr<ParseTree> Parser::parse(const std::vector<Token>& tokens) {
     }
 }
 
-void Parser::printParseTree(const std::vector<Token>& tokens) {
-    auto parseTree = parse(tokens);
-
-    if (!parseTree) {
-        std::cout << "Failed to create parse tree:" << std::endl;
-        for (const auto& error : getErrors()) {
-            std::cout << "  " << error << std::endl;
-        }
-        return;
-    }
-    
-    std::cout << "=== Parse Tree ===" << std::endl;
-    parseTree->print();
-    std::cout << "=================" << std::endl;
-}
-
 void Parser::printGrammarInfo() const {
     std::cout << "=== Grammar Information ===" << std::endl;
     
