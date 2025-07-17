@@ -83,7 +83,10 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Lexer/RegexParser.cpp \
               src/Lexer/Lexer.cpp \
               src/Parser/ParseTree.cpp \
-              src/Parser/Grammar.cpp \
+              src/Parser/GrammarLoader.cpp \
+              src/Parser/TokenMapper.cpp \
+              src/Parser/ParserUtils.cpp \
+              src/Parser/LL1Parser.cpp \
               src/Parser/ASTBuilder.cpp \
               src/Parser/Parser.cpp
 
@@ -176,3 +179,4 @@ help:
 	@echo ""
 	@echo "This Makefile builds the Hulk compiler with custom implementations"
 	@echo "of both lexer and parser, without dependencies on flex or bison."
+

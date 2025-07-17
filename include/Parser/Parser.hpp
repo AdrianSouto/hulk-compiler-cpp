@@ -2,7 +2,7 @@
 #include <memory>
 #include <vector>
 #include <string>
-#include "Grammar.hpp"
+#include "LL1Parser.hpp"
 #include "ParseTree.hpp"
 #include "Lexer/Token.hpp"
 
