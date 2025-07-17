@@ -1,158 +1,101 @@
+# HULK Language Grammar - LL(1) Compatible with elif support + types with parameters
+# Based on working version, adding type-related functionality with type parameters
+
 Terminals: FUNCTION, TYPE, INHERITS, NEW, BASE, IF, ELIF, ELSE, WHILE, FOR, IN, IS, AS, LET, PRINT, TRUE, FALSE, TYPE_NUMBER, TYPE_STRING, TYPE_BOOLEAN, IDENTIFIER, NUMBER, STRING, LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON, COMMA, COLON, DOT, PLUS, MINUS, MULTIPLY, DIVIDE, MODULO, POWER, CONCAT, CONCAT_SPACE, EQUALS, ASSIGN, EQEQ, NOTEQ, LESS, LESSEQ, GREATER, GREATEREQ, AND, OR, NOT, ARROW, EOF
 
-NonTerminals: Program, StatementList, Statement, Expression, BooleanExpression, BooleanExpressionTail, BooleanTerm, BooleanTermTail, BooleanFactor, RelationalExpression, RelationalExpressionTail, AdditiveExpression, AdditiveExpressionTail, MultiplicativeExpression, MultiplicativeExpressionTail, PowerExpression, PowerExpressionTail, Primary, FunctionDef, ParameterList, ParameterListTail, FunctionBody, Block, ExpressionList, ExpressionListTail, ArgumentList, ArgumentListTail, TypeAnnotationOpt, FunctionCallTail, MemberAccessTail, VarDeclaration, AssignmentList, AssignmentListTail, AssignmentDecl, ExpressionBody, IfExpression, ElifList, WhileLoop, ForLoop, TypeInstantiation, TypeDef, MemberList, MemberListTail, Member, MemberTail, InheritsExp, ArgTypeOpt, DestructiveExpressionTail, TypeName
+NonTerminals: Program, StmtList, Stmt, Expr, LogicalOr, LogicalOrRest, LogicalAnd, LogicalAndRest, Equality, EqualityRest, Relational, RelationalRest, Additive, AdditiveRest, Multiplicative, MultiplicativeRest, Power, PowerRest, Unary, Primary, FuncDef, ParamList, ParamRest, Block, ExprList, ArgList, ArgRest, VarDecl, IfExpr, ElifList, WhileLoop, ForLoop, TypeInst, AccessChain, FuncBody, AssignmentList, AssignmentRest, AssignmentDecl, AssignmentTail, TypeDef, TypeAnnotationOpt, InheritsClause, MemberList, Member, MemberTail, TypeName, TypeParams
 
 Productions:
-Program -> StatementList
+Program -> StmtList EOF
 
-StatementList -> Statement StatementList
-StatementList -> ε
+StmtList -> Stmt StmtList | ε
 
-Statement -> Expression SEMICOLON
-Statement -> FunctionDef SEMICOLON
-Statement -> TypeDef SEMICOLON
+Stmt -> Expr SEMICOLON | FuncDef SEMICOLON | TypeDef SEMICOLON
 
-Expression -> BooleanExpression DestructiveExpressionTail
-Expression -> VarDeclaration
-Expression -> IfExpression
-Expression -> WhileLoop
-Expression -> ForLoop
-Expression -> TypeInstantiation
+Expr -> VarDecl | IfExpr | WhileLoop | ForLoop | TypeInst | LogicalOr AssignmentTail
 
-BooleanExpression -> BooleanTerm BooleanExpressionTail
+AssignmentTail -> ASSIGN Expr | ε
 
-BooleanExpressionTail -> OR BooleanTerm BooleanExpressionTail
-BooleanExpressionTail -> ε
+LogicalOr -> LogicalAnd LogicalOrRest
 
-BooleanTerm -> BooleanFactor BooleanTermTail
+LogicalOrRest -> OR LogicalAnd LogicalOrRest | ε
 
-BooleanTermTail -> AND BooleanFactor BooleanTermTail
-BooleanTermTail -> ε
+LogicalAnd -> Equality LogicalAndRest
 
-BooleanFactor -> NOT BooleanFactor
-BooleanFactor -> RelationalExpression
+LogicalAndRest -> AND Equality LogicalAndRest | ε
 
-RelationalExpression -> AdditiveExpression RelationalExpressionTail
+Equality -> Relational EqualityRest
 
-RelationalExpressionTail -> EQEQ AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> NOTEQ AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> LESS AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> LESSEQ AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> GREATER AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> GREATEREQ AdditiveExpression RelationalExpressionTail
-RelationalExpressionTail -> IS TypeName RelationalExpressionTail
-RelationalExpressionTail -> AS TypeName RelationalExpressionTail
-RelationalExpressionTail -> ε
+EqualityRest -> EQEQ Relational EqualityRest | NOTEQ Relational EqualityRest | ε
 
-AdditiveExpression -> MultiplicativeExpression AdditiveExpressionTail
+Relational -> Additive RelationalRest
 
-AdditiveExpressionTail -> PLUS MultiplicativeExpression AdditiveExpressionTail
-AdditiveExpressionTail -> MINUS MultiplicativeExpression AdditiveExpressionTail
-AdditiveExpressionTail -> CONCAT MultiplicativeExpression AdditiveExpressionTail
-AdditiveExpressionTail -> CONCAT_SPACE MultiplicativeExpression AdditiveExpressionTail
-AdditiveExpressionTail -> ε
+RelationalRest -> LESS Additive RelationalRest | LESSEQ Additive RelationalRest | GREATER Additive RelationalRest | GREATEREQ Additive RelationalRest | IS TypeName | AS TypeName | ε
 
-MultiplicativeExpression -> PowerExpression MultiplicativeExpressionTail
+Additive -> Multiplicative AdditiveRest
 
-MultiplicativeExpressionTail -> MULTIPLY PowerExpression MultiplicativeExpressionTail
-MultiplicativeExpressionTail -> DIVIDE PowerExpression MultiplicativeExpressionTail
-MultiplicativeExpressionTail -> MODULO PowerExpression MultiplicativeExpressionTail
-MultiplicativeExpressionTail -> ε
+AdditiveRest -> PLUS Multiplicative AdditiveRest | MINUS Multiplicative AdditiveRest | CONCAT Multiplicative AdditiveRest | CONCAT_SPACE Multiplicative AdditiveRest | ε
 
-PowerExpression -> Primary PowerExpressionTail
+Multiplicative -> Power MultiplicativeRest
 
-PowerExpressionTail -> POWER Primary PowerExpressionTail
-PowerExpressionTail -> ε
+MultiplicativeRest -> MULTIPLY Power MultiplicativeRest | DIVIDE Power MultiplicativeRest | MODULO Power MultiplicativeRest | ε
 
-Primary -> LPAREN Expression RPAREN
-Primary -> NUMBER
-Primary -> STRING
-Primary -> TRUE
-Primary -> FALSE
-Primary -> IDENTIFIER FunctionCallTail MemberAccessTail
-Primary -> PRINT LPAREN Expression RPAREN
-Primary -> BASE FunctionCallTail
-Primary -> Block
+Power -> Unary PowerRest
 
-FunctionDef -> FUNCTION IDENTIFIER LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
+PowerRest -> POWER Unary PowerRest | ε
 
-FunctionBody -> ARROW Expression
-FunctionBody -> Block
-FunctionBody -> ε
+Unary -> NOT Unary | MINUS Unary | Primary
 
-ParameterList -> IDENTIFIER TypeAnnotationOpt ParameterListTail
-ParameterList -> ε
+Primary -> LPAREN Expr RPAREN | NUMBER | STRING | TRUE | FALSE | IDENTIFIER AccessChain | PRINT LPAREN Expr RPAREN | Block | BASE AccessChain
 
-ParameterListTail -> COMMA IDENTIFIER TypeAnnotationOpt ParameterListTail
-ParameterListTail -> ε
+AccessChain -> LPAREN ArgList RPAREN AccessChain | DOT IDENTIFIER AccessChain | ε
 
-TypeAnnotationOpt -> COLON TypeName
-TypeAnnotationOpt -> ε
+FuncDef -> FUNCTION IDENTIFIER LPAREN ParamList RPAREN TypeAnnotationOpt FuncBody
 
-TypeName -> IDENTIFIER
-TypeName -> TYPE_NUMBER
-TypeName -> TYPE_STRING
-TypeName -> TYPE_BOOLEAN
+FuncBody -> ARROW Expr | Block
 
-Block -> LBRACE ExpressionList RBRACE
+ParamList -> IDENTIFIER TypeAnnotationOpt ParamRest | ε
 
-ExpressionList -> Expression SEMICOLON ExpressionListTail
+ParamRest -> COMMA IDENTIFIER TypeAnnotationOpt ParamRest | ε
 
-ExpressionListTail -> Expression SEMICOLON ExpressionListTail
-ExpressionListTail -> ε
+Block -> LBRACE ExprList RBRACE
 
-ArgumentList -> Expression ArgumentListTail
-ArgumentList -> ε
+ExprList -> Expr SEMICOLON ExprList | ε
 
-ArgumentListTail -> COMMA Expression ArgumentListTail
-ArgumentListTail -> ε
+ArgList -> Expr ArgRest | ε
 
-FunctionCallTail -> LPAREN ArgumentList RPAREN
-FunctionCallTail -> ε
+ArgRest -> COMMA Expr ArgRest | ε
 
-MemberAccessTail -> DOT IDENTIFIER FunctionCallTail MemberAccessTail
-MemberAccessTail -> ε
+VarDecl -> LET AssignmentList IN Expr
 
-DestructiveExpressionTail -> ASSIGN Expression
-DestructiveExpressionTail -> ε
+AssignmentList -> AssignmentDecl AssignmentRest
 
-VarDeclaration -> LET AssignmentList IN ExpressionBody
+AssignmentRest -> COMMA AssignmentDecl AssignmentRest | ε
 
-ExpressionBody -> Expression
+AssignmentDecl -> IDENTIFIER TypeAnnotationOpt EQUALS Expr
 
-AssignmentList -> AssignmentDecl AssignmentListTail
+IfExpr -> IF LPAREN Expr RPAREN Expr ElifList ELSE Expr
 
-AssignmentListTail -> COMMA AssignmentDecl AssignmentListTail
-AssignmentListTail -> ε
+ElifList -> ELIF LPAREN Expr RPAREN Expr ElifList | ε
 
-AssignmentDecl -> IDENTIFIER TypeAnnotationOpt EQUALS Expression
+WhileLoop -> WHILE LPAREN Expr RPAREN Expr
 
-IfExpression -> IF LPAREN Expression RPAREN ExpressionBody ElifList ELSE ExpressionBody
+ForLoop -> FOR LPAREN IDENTIFIER IN Expr RPAREN Expr
 
-ElifList -> ELIF LPAREN Expression RPAREN ExpressionBody ElifList
-ElifList -> ε
+TypeInst -> NEW IDENTIFIER LPAREN ArgList RPAREN
 
-WhileLoop -> WHILE LPAREN Expression RPAREN ExpressionBody
+TypeDef -> TYPE IDENTIFIER TypeParams InheritsClause LBRACE MemberList RBRACE
 
-ForLoop -> FOR LPAREN IDENTIFIER IN Expression RPAREN ExpressionBody
+TypeParams -> LPAREN ParamList RPAREN | ε
 
-TypeInstantiation -> NEW IDENTIFIER FunctionCallTail
+TypeAnnotationOpt -> COLON TypeName | ε
 
-TypeDef -> TYPE IDENTIFIER ArgTypeOpt InheritsExp LBRACE MemberList RBRACE
+InheritsClause -> INHERITS IDENTIFIER | ε
 
-InheritsExp -> INHERITS IDENTIFIER ArgTypeOpt
-InheritsExp -> ε
-
-ArgTypeOpt -> LPAREN ParameterList RPAREN
-ArgTypeOpt -> ε
-
-MemberList -> Member MemberListTail
-MemberList -> ε
-
-MemberListTail -> Member MemberListTail
-MemberListTail -> ε
+MemberList -> Member MemberList | ε
 
 Member -> IDENTIFIER TypeAnnotationOpt MemberTail SEMICOLON
 
-MemberTail -> EQUALS Expression
-MemberTail -> LPAREN ParameterList RPAREN TypeAnnotationOpt FunctionBody
+MemberTail -> EQUALS Expr | LPAREN ParamList RPAREN TypeAnnotationOpt FuncBody | ε
+
+TypeName -> IDENTIFIER | TYPE_NUMBER | TYPE_STRING | TYPE_BOOLEAN
