@@ -14,9 +14,15 @@
 
 int main(int argc, char* argv[]) {
     const char* filename = "script.hulk";
+    bool showParseTree = false;
     
-    if (argc > 1) {
-        filename = argv[1];
+    // Check for command line arguments
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--parse-tree" || std::string(argv[i]) == "-pt") {
+            showParseTree = true;
+        } else {
+            filename = argv[i];
+        }
     }
 
     std::cout << "DEBUG: Opening file: " << filename << std::endl;
@@ -44,6 +50,11 @@ int main(int argc, char* argv[]) {
     
     // Uncomment to see grammar information
     // parser.printGrammarInfo();
+    
+    // Print parse tree if requested or always show it for debugging
+    std::cout << "\n=== PARSE TREE ===" << std::endl;
+    parser.printParseTree(tokens);
+    std::cout << "==================\n" << std::endl;
     
     Program* program = parser.parse(tokens);
     

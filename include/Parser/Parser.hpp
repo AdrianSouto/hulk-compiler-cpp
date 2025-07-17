@@ -22,6 +22,9 @@ public:
     // Parse tokens into AST
     Program* parse(const std::vector<Token>& tokens);
     
+    // Parse tokens and return parse tree (for debugging)
+    std::unique_ptr<ParseTree> parseToTree(const std::vector<Token>& tokens);
+    
     // Error handling
     bool hasErrors() const { return !errors.empty(); }
     const std::vector<std::string>& getErrors() const { return errors; }
@@ -29,6 +32,7 @@ public:
     
     // Debug
     void printGrammarInfo() const;
+    void printParseTree(const std::vector<Token>& tokens) const;
 };
 
 } // namespace Parser

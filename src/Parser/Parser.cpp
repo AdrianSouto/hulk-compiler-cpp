@@ -57,6 +57,50 @@ Program* Parser::parse(const std::vector<Token>& tokens) {
     }
 }
 
+std::unique_ptr<ParseTree> Parser::parseToTree(const std::vector<Token>& tokens) {
+    clearErrors();
+    
+    if (!errors.empty()) {
+        // Grammar loading failed
+        return nullptr;
+    }
+    
+    try {
+        // Parse tokens into parse tree
+        auto parseTree = grammar.parse(tokens);
+        
+        if (!parseTree) {
+            errors.push_back("Failed to build parse tree");
+            return nullptr;
+        }
+        
+        return parseTree;
+        
+    } catch (const std::exception& e) {
+        errors.push_back(e.what());
+        return nullptr;
+    }
+}
+
+void Parser::printParseTree(const std::vector<Token>& tokens) const {
+    // Create a temporary parser instance to avoid modifying const state
+    Parser tempParser;
+    
+    auto parseTree = tempParser.parseToTree(tokens);
+    
+    if (!parseTree) {
+        std::cout << "Failed to create parse tree:" << std::endl;
+        for (const auto& error : tempParser.getErrors()) {
+            std::cout << "  " << error << std::endl;
+        }
+        return;
+    }
+    
+    std::cout << "=== Parse Tree ===" << std::endl;
+    parseTree->print();
+    std::cout << "=================" << std::endl;
+}
+
 void Parser::printGrammarInfo() const {
     std::cout << "=== Grammar Information ===" << std::endl;
     
