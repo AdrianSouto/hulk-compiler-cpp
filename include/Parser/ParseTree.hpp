@@ -6,8 +6,6 @@
 
 namespace Parser {
 
-class ParseTreeVisitor;
-
 class ParseNode {
 public:
     Symbol symbol;
@@ -21,9 +19,6 @@ public:
         child->parent = this;
         children.push_back(std::move(child));
     }
-
-    // Accept visitor pattern
-    class ASTNode* accept(ParseTreeVisitor& visitor);
 };
 
 class ParseTree {
@@ -33,10 +28,8 @@ public:
     ParseTree() {}
     ParseTree(std::unique_ptr<ParseNode> r) : root(std::move(r)) {}
 
-    // Accept visitor pattern
-    class ASTNode* accept(ParseTreeVisitor& visitor);
-
     void print(int depth = 0) const;
 };
 
 } // namespace Parser
+

@@ -6,9 +6,6 @@
 #include "ParseTree.hpp"
 #include "Lexer/Token.hpp"
 
-// Forward declaration
-class Program;
-
 namespace Parser {
 
 class Parser {
@@ -19,12 +16,9 @@ private:
 public:
     Parser();
     
-    // Parse tokens into AST
-    Program* parse(const std::vector<Token>& tokens);
-    
-    // Parse tokens and return parse tree (for debugging)
-    std::unique_ptr<ParseTree> parseToTree(const std::vector<Token>& tokens);
-    
+    // Parse tokens and return parse tree - simplified interface
+    std::unique_ptr<ParseTree> parse(const std::vector<Token>& tokens);
+
     // Error handling
     bool hasErrors() const { return !errors.empty(); }
     const std::vector<std::string>& getErrors() const { return errors; }

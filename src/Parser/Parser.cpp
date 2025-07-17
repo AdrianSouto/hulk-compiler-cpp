@@ -1,5 +1,4 @@
 #include "Parser/Parser.hpp"
-#include "Parser/ASTBuilder.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -23,41 +22,7 @@ Parser::Parser() {
     }
 }
 
-Program* Parser::parse(const std::vector<Token>& tokens) {
-    clearErrors();
-    
-    if (!errors.empty()) {
-        // Grammar loading failed
-        return nullptr;
-    }
-    
-    try {
-        // Parse tokens into parse tree
-        auto parseTree = grammar.parse(tokens);
-        
-        if (!parseTree) {
-            errors.push_back("Failed to build parse tree");
-            return nullptr;
-        }
-        
-        // Convert parse tree to AST
-        ASTBuilder builder;
-        Program* ast = builder.buildAST(parseTree.get());
-        
-        if (!ast) {
-            errors.push_back("Failed to build AST from parse tree");
-            return nullptr;
-        }
-        
-        return ast;
-        
-    } catch (const std::exception& e) {
-        errors.push_back(e.what());
-        return nullptr;
-    }
-}
-
-std::unique_ptr<ParseTree> Parser::parseToTree(const std::vector<Token>& tokens) {
+std::unique_ptr<ParseTree> Parser::parse(const std::vector<Token>& tokens) {
     clearErrors();
     
     if (!errors.empty()) {
@@ -86,8 +51,8 @@ void Parser::printParseTree(const std::vector<Token>& tokens) const {
     // Create a temporary parser instance to avoid modifying const state
     Parser tempParser;
     
-    auto parseTree = tempParser.parseToTree(tokens);
-    
+    auto parseTree = tempParser.parse(tokens);
+
     if (!parseTree) {
         std::cout << "Failed to create parse tree:" << std::endl;
         for (const auto& error : tempParser.getErrors()) {

@@ -1,19 +1,7 @@
 #include "Parser/ParseTree.hpp"
-#include "Parser/ParseTreeVisitor.hpp"
 #include <iostream>
 
 namespace Parser {
-
-ASTNode* ParseNode::accept(ParseTreeVisitor& visitor) {
-    return visitor.visit(this);
-}
-
-ASTNode* ParseTree::accept(ParseTreeVisitor& visitor) {
-    if (root) {
-        return root->accept(visitor);
-    }
-    return nullptr;
-}
 
 static void printNode(const ParseNode* node, int depth);
 
@@ -48,3 +36,4 @@ static void printNode(const ParseNode* node, int depth) {
 }
 
 } // namespace Parser
+
