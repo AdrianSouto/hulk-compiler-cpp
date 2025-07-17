@@ -12,30 +12,30 @@ namespace Parser {
 // GRAMMAR LOADING METHODS
 // ============================================================================
 
-Grammar Grammar::loadFromFile(const std::string& filename) {
+LL1Parser LL1Parser::loadFromFile(const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open grammar file: " + filename);
     }
-    
-    Grammar grammar;
+
+    LL1Parser grammar;
     std::vector<std::string> productionLines;
-    
+
     grammar.parseGrammarFile(file, productionLines);
     grammar.processProductions(productionLines);
     grammar.initializeGrammar();
-    
+
     return grammar;
 }
 
-void Grammar::parseGrammarFile(std::ifstream& file, std::vector<std::string>& productionLines) {
+void LL1Parser::parseGrammarFile(std::ifstream& file, std::vector<std::string>& productionLines) {
     std::string line;
     bool readingProductions = false;
-    
+
     while (std::getline(file, line)) {
         line = trim(line);
         if (line.empty()) continue;
-        
+
         if (line.find("Terminals:") == 0) {
             parseTerminals(line);
         }
@@ -51,12 +51,12 @@ void Grammar::parseGrammarFile(std::ifstream& file, std::vector<std::string>& pr
     }
 }
 
-void Grammar::parseTerminals(const std::string& line) {
+void LL1Parser::parseTerminals(const std::string& line) {
     size_t colonPos = line.find(":");
     std::string termsStr = trim(line.substr(colonPos + 1));
     std::istringstream iss(termsStr);
     std::string name;
-    
+
     while (std::getline(iss, name, ',')) {
         name = trim(name);
         if (!name.empty()) {
@@ -65,12 +65,12 @@ void Grammar::parseTerminals(const std::string& line) {
     }
 }
 
-void Grammar::parseNonTerminals(const std::string& line) {
+void LL1Parser::parseNonTerminals(const std::string& line) {
     size_t colonPos = line.find(":");
     std::string ntsStr = trim(line.substr(colonPos + 1));
     std::istringstream iss(ntsStr);
     std::string name;
-    
+
     while (std::getline(iss, name, ',')) {
         name = trim(name);
         if (!name.empty()) {
@@ -79,76 +79,76 @@ void Grammar::parseNonTerminals(const std::string& line) {
     }
 }
 
-void Grammar::processProductions(const std::vector<std::string>& productionLines) {
+void LL1Parser::processProductions(const std::vector<std::string>& productionLines) {
     for (const auto& prodLine : productionLines) {
         processProductionLine(prodLine);
     }
 }
 
-void Grammar::processProductionLine(const std::string& prodLine) {
+void LL1Parser::processProductionLine(const std::string& prodLine) {
     size_t arrowPos = prodLine.find("->");
     if (arrowPos == std::string::npos) return;
-    
+
     std::string lhsStr = trim(prodLine.substr(0, arrowPos));
     Symbol lhsSymbol(lhsStr, SymbolType::NonTerminal);
     std::string rhsStr = trim(prodLine.substr(arrowPos + 2));
-    
+
     std::vector<std::string> alternatives = splitAlternatives(rhsStr);
-    
+
     for (const auto& altStr : alternatives) {
         std::vector<Symbol> rhsSymbols = parseRightHandSide(altStr);
         productions.push_back(Production(lhsSymbol, rhsSymbols));
     }
 }
 
-std::vector<std::string> Grammar::splitAlternatives(const std::string& rhsStr) {
+std::vector<std::string> LL1Parser::splitAlternatives(const std::string& rhsStr) {
     std::vector<std::string> alternatives;
     std::istringstream altStream(rhsStr);
     std::string alt;
-    
+
     while (std::getline(altStream, alt, '|')) {
         alternatives.push_back(trim(alt));
     }
-    
+
     return alternatives;
 }
 
-std::vector<Symbol> Grammar::parseRightHandSide(const std::string& altStr) {
+std::vector<Symbol> LL1Parser::parseRightHandSide(const std::string& altStr) {
     std::vector<Symbol> rhsSymbols;
-    
+
     if (altStr == "ε" || altStr.empty()) {
         // Epsilon production - return empty vector
         return rhsSymbols;
     }
-    
+
     std::istringstream tokenStream(altStr);
     std::string token;
-    
+
     while (tokenStream >> token) {
         if (token == "ε") continue;
-        
+
         SymbolType type = determineSymbolType(token);
         rhsSymbols.push_back(Symbol(token, type));
     }
-    
+
     return rhsSymbols;
 }
 
-SymbolType Grammar::determineSymbolType(const std::string& token) {
+SymbolType LL1Parser::determineSymbolType(const std::string& token) {
     if (nonTerminals.find(token) != nonTerminals.end()) {
         return SymbolType::NonTerminal;
     }
     return SymbolType::Terminal;
 }
 
-void Grammar::initializeGrammar() {
+void LL1Parser::initializeGrammar() {
     setStartSymbol();
     calculateFirst();
     calculateFollow();
     buildParsingTable();
 }
 
-void Grammar::setStartSymbol() {
+void LL1Parser::setStartSymbol() {
     if (!productions.empty()) {
         startSymbol = productions[0].left;
     }
@@ -158,41 +158,41 @@ void Grammar::setStartSymbol() {
 // FIRST AND FOLLOW SET CALCULATION
 // ============================================================================
 
-void Grammar::calculateFirst() {
+void LL1Parser::calculateFirst() {
     initializeFirstSets();
     computeFirstSetsIteratively();
 }
 
-void Grammar::initializeFirstSets() {
+void LL1Parser::initializeFirstSets() {
     // For each terminal, FIRST(terminal) = {terminal}
     for (const auto& terminal : terminals) {
         firstSets[terminal].insert(terminal);
     }
-    
+
     // For each non-terminal, initialize with empty set
     for (const auto& nonTerminal : nonTerminals) {
         firstSets[nonTerminal] = std::unordered_set<std::string>();
     }
-    
+
     // Add epsilon to its own FIRST set
     firstSets["ε"].insert("ε");
 }
 
-void Grammar::computeFirstSetsIteratively() {
+void LL1Parser::computeFirstSetsIteratively() {
     bool changed = true;
     while (changed) {
         changed = false;
-        
+
         for (const auto& prod : productions) {
             const std::string& A = prod.left.value;
             size_t beforeSize = firstSets[A].size();
-            
+
             // Calculate FIRST for the RHS
             std::unordered_set<std::string> rhsFirst = computeFirst(prod.right);
-            
+
             // Add to FIRST(A)
             firstSets[A].insert(rhsFirst.begin(), rhsFirst.end());
-            
+
             if (firstSets[A].size() > beforeSize) {
                 changed = true;
             }
@@ -200,16 +200,16 @@ void Grammar::computeFirstSetsIteratively() {
     }
 }
 
-std::unordered_set<std::string> Grammar::computeFirst(const std::vector<Symbol>& symbols) const {
+std::unordered_set<std::string> LL1Parser::computeFirst(const std::vector<Symbol>& symbols) const {
     std::unordered_set<std::string> result;
-    
+
     if (symbols.empty()) {
         result.insert("ε");
         return result;
     }
-    
+
     bool allCanDeriveEpsilon = true;
-    
+
     for (const auto& symbol : symbols) {
         auto it = firstSets.find(symbol.value);
         if (it != firstSets.end()) {
@@ -219,7 +219,7 @@ std::unordered_set<std::string> Grammar::computeFirst(const std::vector<Symbol>&
                     result.insert(s);
                 }
             }
-            
+
             // Check if symbol can derive epsilon
             if (it->second.find("ε") == it->second.end()) {
                 allCanDeriveEpsilon = false;
@@ -231,56 +231,56 @@ std::unordered_set<std::string> Grammar::computeFirst(const std::vector<Symbol>&
             break;
         }
     }
-    
+
     // If all symbols can derive epsilon, add epsilon to result
     if (allCanDeriveEpsilon) {
         result.insert("ε");
     }
-    
+
     return result;
 }
 
-void Grammar::calculateFollow() {
+void LL1Parser::calculateFollow() {
     // Initialize FOLLOW sets
     for (const auto& nonTerminal : nonTerminals) {
         followSets[nonTerminal] = std::unordered_set<std::string>();
     }
-    
+
     // FOLLOW(start) contains EOF
     followSets[startSymbol.value].insert("EOF");
-    
+
     // Iterate until no changes
     bool changed = true;
     while (changed) {
         changed = false;
-        
+
         for (const auto& prod : productions) {
             const std::string& A = prod.left.value;
             const std::vector<Symbol>& alpha = prod.right;
-            
+
             for (size_t i = 0; i < alpha.size(); ++i) {
                 const Symbol& B = alpha[i];
-                
+
                 if (!B.isNonTerminal()) continue;
-                
+
                 // Calculate FIRST(β) where β is the rest after B
                 std::vector<Symbol> beta(alpha.begin() + i + 1, alpha.end());
                 std::unordered_set<std::string> firstBeta = computeFirst(beta);
-                
+
                 size_t beforeSize = followSets[B.value].size();
-                
+
                 // Add FIRST(β) - {ε} to FOLLOW(B)
                 for (const auto& symbol : firstBeta) {
                     if (symbol != "ε") {
                         followSets[B.value].insert(symbol);
                     }
                 }
-                
+
                 // If β can derive ε or B is at the end, add FOLLOW(A) to FOLLOW(B)
                 if (firstBeta.find("ε") != firstBeta.end() || i == alpha.size() - 1) {
                     followSets[B.value].insert(followSets[A].begin(), followSets[A].end());
                 }
-                
+
                 if (followSets[B.value].size() > beforeSize) {
                     changed = true;
                 }
@@ -289,14 +289,14 @@ void Grammar::calculateFollow() {
     }
 }
 
-void Grammar::buildParsingTable() {
+void LL1Parser::buildParsingTable() {
     for (size_t i = 0; i < productions.size(); ++i) {
         const Production& prod = productions[i];
         const std::string& A = prod.left.value;
-        
+
         // Calculate FIRST(α) where α is the RHS
         std::unordered_set<std::string> firstAlpha = computeFirst(prod.right);
-        
+
         // For each terminal in FIRST(α) - {ε}
         for (const auto& terminal : firstAlpha) {
             if (terminal != "ε") {
@@ -307,7 +307,7 @@ void Grammar::buildParsingTable() {
                 parsingTable[A][terminal] = i;
             }
         }
-        
+
         // If ε is in FIRST(α)
         if (firstAlpha.find("ε") != firstAlpha.end()) {
             // For each terminal in FOLLOW(A)
@@ -326,18 +326,18 @@ void Grammar::buildParsingTable() {
 // PARSING METHODS
 // ============================================================================
 
-std::unique_ptr<ParseTree> Grammar::parse(const std::vector<Token>& tokens) {
+std::unique_ptr<ParseTree> LL1Parser::parse(const std::vector<Token>& tokens) {
     auto root = std::make_unique<ParseNode>(startSymbol);
     auto tree = std::make_unique<ParseTree>(std::move(root));
-    
+
     std::stack<ParseNode*> stack;
     initializeParsingStack(stack, tree->root.get());
-    
+
     size_t tokenIndex = 0;
-    
+
     while (!stack.empty() && stack.top() != nullptr) {
         ParseNode* currentNode = stack.top();
-        
+
         if (currentNode->symbol.isNonTerminal()) {
             processNonTerminal(currentNode, tokens, tokenIndex, stack);
         }
@@ -348,33 +348,33 @@ std::unique_ptr<ParseTree> Grammar::parse(const std::vector<Token>& tokens) {
             stack.pop();
         }
     }
-    
+
     validateParsingCompletion(tokens, tokenIndex);
     return tree;
 }
 
-void Grammar::initializeParsingStack(std::stack<ParseNode*>& stack, ParseNode* root) {
+void LL1Parser::initializeParsingStack(std::stack<ParseNode*>& stack, ParseNode* root) {
     stack.push(nullptr); // Sentinel
     stack.push(root);
 }
 
-void Grammar::processNonTerminal(ParseNode* node, const std::vector<Token>& tokens, 
+void LL1Parser::processNonTerminal(ParseNode* node, const std::vector<Token>& tokens,
                                 size_t& tokenIndex, std::stack<ParseNode*>& stack) {
     Token lookahead = getLookaheadToken(tokens, tokenIndex);
     std::string lookaheadSymbol = getTerminalFromToken(lookahead);
-    
+
     size_t productionIndex = findProductionInTable(node->symbol.value, lookaheadSymbol, lookahead);
     const Production& prod = productions[productionIndex];
-    
+
     stack.pop();
     expandNonTerminal(node, prod, stack);
 }
 
-void Grammar::processTerminal(ParseNode* node, const std::vector<Token>& tokens, 
+void LL1Parser::processTerminal(ParseNode* node, const std::vector<Token>& tokens,
                              size_t& tokenIndex, std::stack<ParseNode*>& stack) {
     Token lookahead = getLookaheadToken(tokens, tokenIndex);
     std::string lookaheadSymbol = getTerminalFromToken(lookahead);
-    
+
     if (node->symbol.value == lookaheadSymbol) {
         node->token = lookahead;
         stack.pop();
@@ -384,29 +384,29 @@ void Grammar::processTerminal(ParseNode* node, const std::vector<Token>& tokens,
     }
 }
 
-Token Grammar::getLookaheadToken(const std::vector<Token>& tokens, size_t index) const {
+Token LL1Parser::getLookaheadToken(const std::vector<Token>& tokens, size_t index) const {
     return (index < tokens.size()) ? tokens[index] : Token("", TOKEN_EOF, 0, 0);
 }
 
-size_t Grammar::findProductionInTable(const std::string& nonTerminal, const std::string& terminal, 
+size_t LL1Parser::findProductionInTable(const std::string& nonTerminal, const std::string& terminal,
                                      const Token& lookahead) const {
     auto nonTerminalIt = parsingTable.find(nonTerminal);
     if (nonTerminalIt == parsingTable.end()) {
         throwUnexpectedTokenError(lookahead);
     }
-    
+
     auto terminalIt = nonTerminalIt->second.find(terminal);
     if (terminalIt == nonTerminalIt->second.end()) {
         throwUnexpectedTokenError(lookahead);
     }
-    
+
     return terminalIt->second;
 }
 
-void Grammar::expandNonTerminal(ParseNode* node, const Production& prod, 
+void LL1Parser::expandNonTerminal(ParseNode* node, const Production& prod,
                                std::stack<ParseNode*>& stack) {
     std::vector<ParseNode*> childPtrs;
-    
+
     // Add all children to the node in correct order
     for (size_t i = 0; i < prod.right.size(); ++i) {
         auto child = std::make_unique<ParseNode>(prod.right[i]);
@@ -414,27 +414,27 @@ void Grammar::expandNonTerminal(ParseNode* node, const Production& prod,
         childPtrs.push_back(childPtr);
         node->addChild(std::move(child));
     }
-    
+
     // Push children to stack in reverse order for processing
     for (int i = childPtrs.size() - 1; i >= 0; --i) {
         stack.push(childPtrs[i]);
     }
 }
 
-void Grammar::validateParsingCompletion(const std::vector<Token>& tokens, size_t tokenIndex) const {
+void LL1Parser::validateParsingCompletion(const std::vector<Token>& tokens, size_t tokenIndex) const {
     if (tokenIndex < tokens.size() && tokens[tokenIndex].type != TOKEN_EOF) {
         throw std::runtime_error("Syntax error: unexpected tokens after end of program");
     }
 }
 
-void Grammar::throwUnexpectedTokenError(const Token& lookahead) const {
-    throw std::runtime_error("Syntax error: unexpected token '" + lookahead.lexeme + 
+void LL1Parser::throwUnexpectedTokenError(const Token& lookahead) const {
+    throw std::runtime_error("Syntax error: unexpected token '" + lookahead.lexeme +
                            "' at line " + std::to_string(lookahead.line));
 }
 
-void Grammar::throwTerminalMismatchError(const std::string& expected, const Token& found) const {
-    throw std::runtime_error("Syntax error: expected '" + expected + 
-                           "' but found '" + found.lexeme + 
+void LL1Parser::throwTerminalMismatchError(const std::string& expected, const Token& found) const {
+    throw std::runtime_error("Syntax error: expected '" + expected +
+                           "' but found '" + found.lexeme +
                            "' at line " + std::to_string(found.line));
 }
 
@@ -442,13 +442,13 @@ void Grammar::throwTerminalMismatchError(const std::string& expected, const Toke
 // TOKEN TO SYMBOL MAPPING AND UTILITY METHODS
 // ============================================================================
 
-std::string Grammar::getTerminalFromToken(const Token& token) const {
+std::string LL1Parser::getTerminalFromToken(const Token& token) const {
     // Use cache for performance
     auto it = tokenSymbolCache.find(static_cast<int>(token.type));
     if (it != tokenSymbolCache.end()) {
         return it->second;
     }
-    
+
     // Map token types to terminal symbols
     std::string result;
     switch (token.type) {
@@ -506,13 +506,13 @@ std::string Grammar::getTerminalFromToken(const Token& token) const {
         case TOKEN_EOF: result = "EOF"; break;
         default: result = "UNKNOWN"; break;
     }
-    
+
     // Cache the result
     tokenSymbolCache[static_cast<int>(token.type)] = result;
     return result;
 }
 
-std::string Grammar::trim(const std::string& str) {
+std::string LL1Parser::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
     size_t end = str.find_last_not_of(" \t\r\n");
@@ -523,7 +523,7 @@ std::string Grammar::trim(const std::string& str) {
 // VALIDATION AND CONFLICT DETECTION METHODS
 // ============================================================================
 
-bool Grammar::isLL1() const {
+bool LL1Parser::isLL1() const {
     // Check if there are any conflicts in the parsing table
     for (const auto& [nonTerminal, row] : parsingTable) {
         std::unordered_set<size_t> usedProductions;
@@ -537,24 +537,24 @@ bool Grammar::isLL1() const {
     return true;
 }
 
-std::vector<std::string> Grammar::getConflicts() const {
+std::vector<std::string> LL1Parser::getConflicts() const {
     std::vector<std::string> conflicts;
-    
+
     // Check each non-terminal
     for (const auto& nonTerminal : nonTerminals) {
         std::unordered_map<std::string, std::vector<size_t>> entries;
-        
+
         // Collect all productions for each terminal
         for (size_t i = 0; i < productions.size(); ++i) {
             if (productions[i].left.value == nonTerminal) {
                 std::unordered_set<std::string> firstSet = computeFirst(productions[i].right);
-                
+
                 for (const auto& terminal : firstSet) {
                     if (terminal != "ε") {
                         entries[terminal].push_back(i);
                     }
                 }
-                
+
                 // If epsilon is in FIRST, add FOLLOW terminals
                 if (firstSet.find("ε") != firstSet.end()) {
                     auto followIt = followSets.find(nonTerminal);
@@ -566,7 +566,7 @@ std::vector<std::string> Grammar::getConflicts() const {
                 }
             }
         }
-        
+
         // Check for conflicts
         for (const auto& [terminal, prods] : entries) {
             if (prods.size() > 1) {
@@ -580,11 +580,11 @@ std::vector<std::string> Grammar::getConflicts() const {
             }
         }
     }
-    
+
     return conflicts;
 }
 
-void Grammar::printFirst() const {
+void LL1Parser::printFirst() const {
     std::cout << "FIRST sets:" << std::endl;
     for (const auto& [symbol, firstSet] : firstSets) {
         if (nonTerminals.find(symbol) != nonTerminals.end()) {
@@ -600,7 +600,7 @@ void Grammar::printFirst() const {
     }
 }
 
-void Grammar::printFollow() const {
+void LL1Parser::printFollow() const {
     std::cout << "FOLLOW sets:" << std::endl;
     for (const auto& [symbol, followSet] : followSets) {
         std::cout << "  FOLLOW(" << symbol << ") = { ";
@@ -614,7 +614,7 @@ void Grammar::printFollow() const {
     }
 }
 
-void Grammar::printParsingTable() const {
+void LL1Parser::printParsingTable() const {
     std::cout << "LL(1) Parsing Table:" << std::endl;
     for (const auto& [nonTerminal, row] : parsingTable) {
         std::cout << "  " << nonTerminal << ":" << std::endl;

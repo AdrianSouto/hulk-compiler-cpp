@@ -13,7 +13,7 @@ namespace Parser {
 
 class Parser {
 private:
-    Grammar grammar;
+    LL1Parser grammar;
     std::vector<std::string> errors;
 
 public:
@@ -36,3 +36,4 @@ public:
 };
 
 } // namespace Parser
+

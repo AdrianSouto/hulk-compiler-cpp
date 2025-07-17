@@ -14,8 +14,8 @@
 
 namespace Parser {
 
-class Grammar {
-private:
+class LL1Parser {
+public:
     // Core grammar data - using more efficient containers
     Symbol startSymbol;
     std::unordered_set<std::string> terminals;
@@ -71,12 +71,12 @@ private:
     static std::string trim(const std::string& str);
     std::string getTerminalFromToken(const Token& token) const;
 
-public:
-    Grammar() = default;
-    
+    // Constructor
+    LL1Parser() = default;
+
     // Load grammar from file
-    static Grammar loadFromFile(const std::string& filename);
-    
+    static LL1Parser loadFromFile(const std::string& filename);
+
     // Parse tokens into parse tree
     std::unique_ptr<ParseTree> parse(const std::vector<Token>& tokens);
     
@@ -91,3 +91,4 @@ public:
 };
 
 } // namespace Parser
+

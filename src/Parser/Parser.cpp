@@ -8,8 +8,8 @@ namespace Parser {
 Parser::Parser() {
     try {
         // Load grammar from file
-        grammar = Grammar::loadFromFile("grammar.txt");
-        
+        grammar = LL1Parser::loadFromFile("grammar.txt");
+
         // Check if grammar is LL(1)
         if (!grammar.isLL1()) {
             errors.push_back("Warning: Grammar is not LL(1), parsing may fail");
@@ -123,3 +123,4 @@ void Parser::printGrammarInfo() const {
 }
 
 } // namespace Parser
+
