@@ -356,9 +356,7 @@ void LL1Parser::throwTerminalMismatchError(const std::string& expected, const To
 }
 
 
-bool LL1Parser::isLL1() const {
-    return ParserUtils::isLL1Grammar(parsingTable);
-}
+
 
 
 

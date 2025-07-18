@@ -18,10 +18,7 @@ public:
         const std::unordered_map<std::string, std::unordered_set<std::string>>& firstSets
     );
 
-    // Validation utilities
-    static bool isLL1Grammar(
-        const std::unordered_map<std::string, std::unordered_map<std::string, size_t>>& parsingTable
-    );
+
 
 };
 

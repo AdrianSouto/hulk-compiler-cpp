@@ -24,8 +24,7 @@ public:
     // Main parsing method
     std::unique_ptr<ParseTree> parse(const std::vector<Token>& tokens);
     
-    // Validation methods (using ParserUtils)
-    bool isLL1() const;
+
 
 
 private:

@@ -55,21 +55,7 @@ std::unordered_set<std::string> ParserUtils::computeFirst(
     return result;
 }
 
-bool ParserUtils::isLL1Grammar(
-    const std::unordered_map<std::string, std::unordered_map<std::string, size_t>>& parsingTable) {
 
-    // Check if there are any conflicts in the parsing table
-    for (const auto& [nonTerminal, row] : parsingTable) {
-        std::unordered_set<size_t> usedProductions;
-        for (const auto& [terminal, production] : row) {
-            if (usedProductions.find(production) != usedProductions.end()) {
-                return false;
-            }
-            usedProductions.insert(production);
-        }
-    }
-    return true;
-}
 
 
 
