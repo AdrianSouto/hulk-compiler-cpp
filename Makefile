@@ -77,16 +77,17 @@ CPP_SOURCES = src/AST/ASTNode.cpp \
               src/Visitors/LLVMCodegenVisitor_Types.cpp \
               src/Visitors/LLVMCodegenVisitor_PrintExpression.cpp \
               src/Lexer/Token.cpp \
-              src/Lexer/DFA.cpp \
-              src/Lexer/NFA.cpp \
-              src/Lexer/RegularExpression.cpp \
-              src/Lexer/RegexParser.cpp \
+              src/Lexer/FiniteAutomaton.cpp \
+              src/Lexer/NonDeterministicAutomaton.cpp \
+              src/Lexer/PatternExpression.cpp \
+              src/Lexer/PatternParser.cpp \
               src/Lexer/Lexer.cpp \
               src/Parser/ParseTree.cpp \
               src/Parser/TokenMapper.cpp \
               src/Parser/ParserUtils.cpp \
               src/Parser/LL1Parser.cpp \
-              src/Parser/Parser.cpp
+              src/Parser/Parser.cpp \
+
 
 MAIN_SOURCE = main_new.cpp
 

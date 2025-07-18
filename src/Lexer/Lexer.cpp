@@ -1,248 +1,247 @@
 #include "Lexer/Lexer.hpp"
-#include "Lexer/RegexParser.hpp"
+#include "Lexer/PatternParser.hpp"
 #include <cctype>
 #include <iostream>
 #include <map>
 
-Lexer::Lexer() : currentLine(1), currentColumn(1) {
-    initializePatterns();
+Lexer::Lexer() : currentRow(1), currentCol(1) {
+    initializeRecognitionPatterns();
 }
 
-void Lexer::initializePatterns() {
-    // Define token patterns in order of priority
-    std::vector<std::tuple<TokenType, std::string>> patterns = {
-        // String literals (highest priority)
-        {TOKEN_STRING, "\\\"([^\\\"\n\\\\]|\\\\.)*\\\""},
+void Lexer::initializeRecognitionPatterns() {
+
+    std::vector<std::tuple<TokenKind, std::string>> patterns = {
+
+        {TOKEN_TEXT, "\\\"([^\\\"\n\\\\]|\\\\.)*\\\""},
         
-        // Numbers (decimal and integer)
-        {TOKEN_NUMBER, "[0-9]+\\.?[0-9]*"},
+
+        {TOKEN_NUMERIC, "[0-9]+\\.?[0-9]*"},
         
-        // Multi-character operators (before single-char to avoid conflicts)
-        {TOKEN_EQEQ, "=="},
-        {TOKEN_NOTEQ, "!="},
-        {TOKEN_LESSEQ, "<="},
-        {TOKEN_GREATEREQ, ">="},
-        {TOKEN_AND, "&&"},
-        {TOKEN_CONCAT_SPACE, "@@"},
-        {TOKEN_ARROW, "=>"},
-        {TOKEN_POWER, "\\*\\*"},
-        {TOKEN_ASSIGN, ":="},
+
+        {TOKEN_EQUAL, "=="},
+        {TOKEN_NOTEQUAL, "!="},
+        {TOKEN_LESSEQUAL, "<="},
+        {TOKEN_GREATEREQUAL, ">="},
+        {TOKEN_LOGICAL_AND, "&&"},
+        {TOKEN_JOIN_SPACE, "@@"},
+        {TOKEN_IMPLIES, "=>"},
+        {TOKEN_EXPONENT, "\\*\\*"},
+        {TOKEN_BIND, ":="},
         
-        // Single character operators
-        {TOKEN_PLUS, "\\+"},
-        {TOKEN_MINUS, "\\-"},
-        {TOKEN_MULTIPLY, "\\*"},
-        {TOKEN_DIVIDE, "/"},
-        {TOKEN_MODULO, "%"},
-        {TOKEN_CONCAT, "@"},
-        {TOKEN_EQUALS, "="},
-        {TOKEN_LESS, "<"},
-        {TOKEN_GREATER, ">"},
-        {TOKEN_NOT, "!"},
-        {TOKEN_OR, "\\|"},
+
+        {TOKEN_ADD, "\\+"},
+        {TOKEN_SUBTRACT, "\\-"},
+        {TOKEN_TIMES, "\\*"},
+        {TOKEN_QUOTIENT, "/"},
+        {TOKEN_REMAINDER, "%"},
+        {TOKEN_JOIN, "@"},
+        {TOKEN_MATCH, "="},
+        {TOKEN_BELOW, "<"},
+        {TOKEN_ABOVE, ">"},
+        {TOKEN_NEGATE, "!"},
+        {TOKEN_LOGICAL_OR, "\\|"},
         
-        // Delimiters
-        {TOKEN_LPAREN, "\\("},
-        {TOKEN_RPAREN, "\\)"},
-        {TOKEN_LBRACE, "\\{"},
-        {TOKEN_RBRACE, "\\}"},
-        {TOKEN_SEMICOLON, ";"},
-        {TOKEN_COMMA, ","},
-        {TOKEN_COLON, ":"},
-        {TOKEN_DOT, "\\."},
+
+        {TOKEN_OPEN_PAREN, "\\("},
+        {TOKEN_CLOSE_PAREN, "\\)"},
+        {TOKEN_OPEN_BRACE, "\\{"},
+        {TOKEN_CLOSE_BRACE, "\\}"},
+        {TOKEN_TERMINATOR, ";"},
+        {TOKEN_SEPARATOR, ","},
+        {TOKEN_MARKER, ":"},
+        {TOKEN_ACCESSOR, "\\."},
         
-        // Identifiers (lowest priority among named tokens)
-        {TOKEN_IDENTIFIER, "[a-zA-Z][a-zA-Z0-9_]*"},
+
+        {TOKEN_NAME, "[a-zA-Z][a-zA-Z0-9_]*"},
     };
     
-    std::vector<NFA> nfas;
+    std::vector<NonDeterministicAutomaton> automatons;
     
-    // Create NFA for each pattern
-    for (const auto& [tokenType, pattern] : patterns) {
-        RegexParser parser(pattern);
-        auto regex = parser.parse();
-        NFA nfa = regex->toNFA();
+
+    for (const auto& [tokenKind, patternString] : patterns) {
+        PatternParser parser(patternString);
+        auto patternExpr = parser.parse();
+        NonDeterministicAutomaton automaton = patternExpr->toAutomaton();
         
-        // Set token type for final states
-        for (int finalState : nfa.getFinalStates()) {
-            nfa.setTokenType(finalState, tokenType);
+
+        for (int acceptingState : automaton.getAcceptingStates()) {
+            automaton.setTokenKind(acceptingState, tokenKind);
         }
         
-        nfas.push_back(nfa);
+        automatons.push_back(automaton);
     }
     
-    // Combine all NFAs into one
-    if (nfas.empty()) return;
+
+    if (automatons.empty()) return;
     
-    NFA combined = nfas[0];
-    for (size_t i = 1; i < nfas.size(); i++) {
-        combined = NFA::createUnion(combined, nfas[i]);
+    NonDeterministicAutomaton combined = automatons[0];
+    for (size_t i = 1; i < automatons.size(); i++) {
+        combined = NonDeterministicAutomaton::createUnion(combined, automatons[i]);
     }
     
-    // Convert to DFA for efficient matching
-    automaton = combined.convertToDFA();
+
+    recognizer = combined.convertToDeterministic();
 }
 
-std::vector<Token> Lexer::tokenize(const std::string& input) {
+std::vector<Token> Lexer::analyze(const std::string& input) {
     std::vector<Token> tokens;
     size_t position = 0;
     
     while (position < input.size()) {
-        // Skip whitespace
+
         if (std::isspace(input[position])) {
             if (input[position] == '\n') {
-                currentLine++;
-                currentColumn = 1;
+                currentRow++;
+                currentCol = 1;
             } else {
-                currentColumn++;
+                currentCol++;
             }
             position++;
             continue;
         }
         
-        // Skip single-line comments
+
         if (position + 1 < input.size() && 
             input[position] == '/' && input[position + 1] == '/') {
-            // Skip until end of line
+
             while (position < input.size() && input[position] != '\n') {
                 position++;
             }
             continue;
         }
         
-        // Scan next token
+
         Token token = scanToken(input, position);
         
-        if (token.type == TOKEN_ERROR) {
+        if (token.kind == TOKEN_INVALID) {
             std::cerr << "Error: Unrecognized character '" << input[position] 
-                     << "' at line " << currentLine << ", column " << currentColumn << std::endl;
+                     << "' at row " << currentRow << ", column " << currentCol << std::endl;
             position++;
-            currentColumn++;
+            currentCol++;
         } else {
             tokens.push_back(token);
-            position += token.lexeme.length();
-            currentColumn += token.lexeme.length();
+            position += token.text.length();
+            currentCol += token.text.length();
         }
     }
     
-    // Add EOF token
-    tokens.push_back(Token("", TOKEN_EOF, currentLine, currentColumn));
+
+    tokens.push_back(Token("", TOKEN_ENDFILE, currentRow, currentCol));
     
     return tokens;
 }
 
 Token Lexer::scanToken(const std::string& input, size_t& startPos) {
     size_t currentPos = startPos;
-    int currentState = automaton.getStartState();
-    int lastFinalState = -1;
-    size_t lastFinalPos = startPos;
+    int currentState = recognizer.getInitialState();
+    int lastAcceptingState = -1;
+    size_t lastAcceptingPos = startPos;
     
-    // Handle string literals specially
+
     if (input[currentPos] == '"') {
         currentPos++;
-        size_t stringStart = currentPos;
         
         while (currentPos < input.size()) {
             if (input[currentPos] == '"') {
                 currentPos++;
-                std::string lexeme = input.substr(startPos, currentPos - startPos);
-                return Token(lexeme, TOKEN_STRING, currentLine, currentColumn);
+                std::string text = input.substr(startPos, currentPos - startPos);
+                return Token(text, TOKEN_TEXT, currentRow, currentCol);
             } else if (input[currentPos] == '\\' && currentPos + 1 < input.size()) {
-                // Skip escape sequence
+
                 currentPos += 2;
             } else if (input[currentPos] == '\n') {
-                // Unterminated string
+
                 break;
             } else {
                 currentPos++;
             }
         }
         
-        // Error: unterminated string
-        return Token("", TOKEN_ERROR, currentLine, currentColumn);
+
+        return Token("", TOKEN_INVALID, currentRow, currentCol);
     }
     
-    // Regular DFA matching
+
     while (currentPos < input.size()) {
         char ch = input[currentPos];
         
-        // Check for whitespace or comment start
+
         if (std::isspace(ch) || 
             (ch == '/' && currentPos + 1 < input.size() && input[currentPos + 1] == '/')) {
             break;
         }
         
-        int nextState = automaton.getNextState(ch, currentState);
+        int nextState = recognizer.getNextState(ch, currentState);
         
         if (nextState < 0) {
-            // No valid transition
+
             break;
         }
         
         currentState = nextState;
         currentPos++;
         
-        // Check if current state is final
-        if (automaton.isFinalState(currentState)) {
-            lastFinalState = currentState;
-            lastFinalPos = currentPos;
+
+        if (recognizer.isAcceptingState(currentState)) {
+            lastAcceptingState = currentState;
+            lastAcceptingPos = currentPos;
         }
     }
     
-    // Check if we found a valid token
-    if (lastFinalState >= 0) {
-        std::string lexeme = input.substr(startPos, lastFinalPos - startPos);
-        TokenType type = automaton.getTokenType(lastFinalState);
+
+    if (lastAcceptingState >= 0) {
+        std::string text = input.substr(startPos, lastAcceptingPos - startPos);
+        TokenKind kind = recognizer.getTokenKind(lastAcceptingState);
         
-        // Special handling for numbers
-        if (type == TOKEN_NUMBER) {
-            // Check if next character invalidates the number
-            if (lastFinalPos < input.size() && 
-                (std::isalpha(input[lastFinalPos]) || input[lastFinalPos] == '_')) {
-                return Token("", TOKEN_ERROR, currentLine, currentColumn);
+
+        if (kind == TOKEN_NUMERIC) {
+
+            if (lastAcceptingPos < input.size() && 
+                (std::isalpha(input[lastAcceptingPos]) || input[lastAcceptingPos] == '_')) {
+                return Token("", TOKEN_INVALID, currentRow, currentCol);
             }
         }
         
-        // Check if identifier is actually a keyword
-        if (type == TOKEN_IDENTIFIER) {
-            // Map of keywords
-            static const std::map<std::string, TokenType> keywords = {
-                {"let", TOKEN_LET},
-                {"in", TOKEN_IN},
-                {"function", TOKEN_FUNCTION},
-                {"type", TOKEN_TYPE},
-                {"inherits", TOKEN_INHERITS},
-                {"new", TOKEN_NEW},
-                {"base", TOKEN_BASE},
-                {"if", TOKEN_IF},
-                {"elif", TOKEN_ELIF},
-                {"else", TOKEN_ELSE},
-                {"while", TOKEN_WHILE},
-                {"for", TOKEN_FOR},
-                {"is", TOKEN_IS},
-                {"as", TOKEN_AS},
-                {"print", TOKEN_PRINT},
-                {"true", TOKEN_TRUE},
-                {"false", TOKEN_FALSE},
-                {"Number", TOKEN_TYPE_NUMBER},
-                {"String", TOKEN_TYPE_STRING},
-                {"Boolean", TOKEN_TYPE_BOOLEAN}
+
+        if (kind == TOKEN_NAME) {
+
+            static const std::map<std::string, TokenKind> keywords = {
+                {"declare", TOKEN_DECLARE},
+                {"within", TOKEN_WITHIN},
+                {"procedure", TOKEN_PROCEDURE},
+                {"class", TOKEN_CLASS},
+                {"extends", TOKEN_EXTENDS},
+                {"create", TOKEN_CREATE},
+                {"super", TOKEN_SUPER},
+                {"when", TOKEN_WHEN},
+                {"elseif", TOKEN_ELSEIF},
+                {"otherwise", TOKEN_OTHERWISE},
+                {"loop", TOKEN_LOOP},
+                {"iterate", TOKEN_ITERATE},
+                {"instanceof", TOKEN_INSTANCEOF},
+                {"cast", TOKEN_CAST},
+                {"output", TOKEN_OUTPUT},
+                {"affirmative", TOKEN_AFFIRMATIVE},
+                {"negative", TOKEN_NEGATIVE},
+                {"Numeric", TOKEN_KIND_NUMERIC},
+                {"Text", TOKEN_KIND_TEXT},
+                {"Logical", TOKEN_KIND_LOGICAL}
             };
             
-            auto it = keywords.find(lexeme);
+            auto it = keywords.find(text);
             if (it != keywords.end()) {
-                type = it->second;
+                kind = it->second;
             }
         }
         
-        return Token(lexeme, type, currentLine, currentColumn);
+        return Token(text, kind, currentRow, currentCol);
     }
     
-    // No valid token found
-    return Token("", TOKEN_ERROR, currentLine, currentColumn);
+
+    return Token("", TOKEN_INVALID, currentRow, currentCol);
 }
 
 void Lexer::reset() {
-    currentLine = 1;
-    currentColumn = 1;
+    currentRow = 1;
+    currentCol = 1;
 }
