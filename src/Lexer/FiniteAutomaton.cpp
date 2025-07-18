@@ -40,11 +40,11 @@ bool FiniteAutomaton::evaluate(const std::string& input) {
     return isAcceptingState(currentState);
 }
 
-TokenKind FiniteAutomaton::getTokenKind(int state) const {
+TokenType FiniteAutomaton::getTokenType(int state) const {
     auto it = acceptingStateTokens.find(state);
     return (it != acceptingStateTokens.end()) ? it->second : TOKEN_UNDEFINED;
 }
 
-void FiniteAutomaton::setTokenKind(int state, TokenKind kind) {
-    acceptingStateTokens[state] = kind;
+void FiniteAutomaton::setTokenType(int state, TokenType type) {
+    acceptingStateTokens[state] = type;
 }

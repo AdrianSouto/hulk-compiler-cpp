@@ -15,7 +15,7 @@ private:
     std::set<char> inputAlphabet;
     std::map<int, std::vector<StateTransition>> stateTransitions;
     std::vector<int> acceptingStates;
-    std::map<int, TokenKind> acceptingStateTokens;
+    std::map<int, TokenType> acceptingStateTokens;
     
     // Helper methods for deterministic conversion
     std::pair<std::set<int>, bool> computeEpsilonClosure(int state, bool isInitial);
@@ -58,5 +58,5 @@ public:
     // Getters
     int getStateCount() const { return stateCount; }
     const std::vector<int>& getAcceptingStates() const { return acceptingStates; }
-    void setTokenKind(int state, TokenKind kind) { acceptingStateTokens[state] = kind; }
+    void setTokenType(int state, TokenType type) { acceptingStateTokens[state] = type; }
 };

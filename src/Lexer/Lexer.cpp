@@ -9,69 +9,65 @@ Lexer::Lexer() : currentRow(1), currentCol(1) {
 }
 
 void Lexer::initializeRecognitionPatterns() {
-
-    std::vector<std::tuple<TokenKind, std::string>> patterns = {
-
-        {TOKEN_TEXT, "\\\"([^\\\"\n\\\\]|\\\\.)*\\\""},
+    std::vector<std::tuple<TokenType, std::string>> patterns = {
+        // String literals
+        {TOKEN_STRING, "\\\"([^\\\"\n\\\\]|\\\\.)*\\\""},
         
-
-        {TOKEN_NUMERIC, "[0-9]+\\.?[0-9]*"},
+        // Numbers
+        {TOKEN_NUMBER, "[0-9]+\\.?[0-9]*"},
         
-
-        {TOKEN_EQUAL, "=="},
-        {TOKEN_NOTEQUAL, "!="},
-        {TOKEN_LESSEQUAL, "<="},
-        {TOKEN_GREATEREQUAL, ">="},
-        {TOKEN_LOGICAL_AND, "&&"},
-        {TOKEN_JOIN_SPACE, "@@"},
-        {TOKEN_IMPLIES, "=>"},
-        {TOKEN_EXPONENT, "\\*\\*"},
-        {TOKEN_BIND, ":="},
+        // Multi-character operators (order matters - longer first)
+        {TOKEN_CONCAT_SPACE, "@@"},
+        {TOKEN_POWER, "\\*\\*"},
+        {TOKEN_ASSIGN, ":="},
+        {TOKEN_EQEQ, "=="},
+        {TOKEN_NOTEQ, "!="},
+        {TOKEN_LESSEQ, "<="},
+        {TOKEN_GREATEREQ, ">="},
+        {TOKEN_AND, "&&"},
+        {TOKEN_ARROW, "=>"},
         
-
-        {TOKEN_ADD, "\\+"},
-        {TOKEN_SUBTRACT, "\\-"},
-        {TOKEN_TIMES, "\\*"},
-        {TOKEN_QUOTIENT, "/"},
-        {TOKEN_REMAINDER, "%"},
-        {TOKEN_JOIN, "@"},
-        {TOKEN_MATCH, "="},
-        {TOKEN_BELOW, "<"},
-        {TOKEN_ABOVE, ">"},
-        {TOKEN_NEGATE, "!"},
-        {TOKEN_LOGICAL_OR, "\\|"},
+        // Single character operators
+        {TOKEN_PLUS, "\\+"},
+        {TOKEN_MINUS, "\\-"},
+        {TOKEN_MULTIPLY, "\\*"},
+        {TOKEN_DIVIDE, "/"},
+        {TOKEN_MODULO, "%"},
+        {TOKEN_CONCAT, "@"},
+        {TOKEN_EQUALS, "="},
+        {TOKEN_LESS, "<"},
+        {TOKEN_GREATER, ">"},
+        {TOKEN_NOT, "!"},
+        {TOKEN_OR, "\\|"},
         
-
-        {TOKEN_OPEN_PAREN, "\\("},
-        {TOKEN_CLOSE_PAREN, "\\)"},
-        {TOKEN_OPEN_BRACE, "\\{"},
-        {TOKEN_CLOSE_BRACE, "\\}"},
-        {TOKEN_TERMINATOR, ";"},
-        {TOKEN_SEPARATOR, ","},
-        {TOKEN_MARKER, ":"},
-        {TOKEN_ACCESSOR, "\\."},
+        // Delimiters
+        {TOKEN_LPAREN, "\\("},
+        {TOKEN_RPAREN, "\\)"},
+        {TOKEN_LBRACE, "\\{"},
+        {TOKEN_RBRACE, "\\}"},
+        {TOKEN_SEMICOLON, ";"},
+        {TOKEN_COMMA, ","},
+        {TOKEN_COLON, ":"},
+        {TOKEN_DOT, "\\."},
         
-
-        {TOKEN_NAME, "[a-zA-Z][a-zA-Z0-9_]*"},
+        // Identifiers (must be last to allow keywords to match first)
+        {TOKEN_IDENTIFIER, "[a-zA-Z][a-zA-Z0-9_]*"},
     };
     
     std::vector<NonDeterministicAutomaton> automatons;
     
-
-    for (const auto& [tokenKind, patternString] : patterns) {
+    for (const auto& [tokenType, patternString] : patterns) {
         PatternParser parser(patternString);
         auto patternExpr = parser.parse();
         NonDeterministicAutomaton automaton = patternExpr->toAutomaton();
         
-
         for (int acceptingState : automaton.getAcceptingStates()) {
-            automaton.setTokenKind(acceptingState, tokenKind);
+            automaton.setTokenType(acceptingState, tokenType);
         }
         
         automatons.push_back(automaton);
     }
     
-
     if (automatons.empty()) return;
     
     NonDeterministicAutomaton combined = automatons[0];
@@ -79,7 +75,6 @@ void Lexer::initializeRecognitionPatterns() {
         combined = NonDeterministicAutomaton::createUnion(combined, automatons[i]);
     }
     
-
     recognizer = combined.convertToDeterministic();
 }
 
@@ -88,7 +83,7 @@ std::vector<Token> Lexer::analyze(const std::string& input) {
     size_t position = 0;
     
     while (position < input.size()) {
-
+        // Skip whitespace
         if (std::isspace(input[position])) {
             if (input[position] == '\n') {
                 currentRow++;
@@ -100,20 +95,18 @@ std::vector<Token> Lexer::analyze(const std::string& input) {
             continue;
         }
         
-
+        // Skip comments
         if (position + 1 < input.size() && 
             input[position] == '/' && input[position + 1] == '/') {
-
             while (position < input.size() && input[position] != '\n') {
                 position++;
             }
             continue;
         }
         
-
         Token token = scanToken(input, position);
         
-        if (token.kind == TOKEN_INVALID) {
+        if (token.type == TOKEN_INVALID) {
             std::cerr << "Error: Unrecognized character '" << input[position] 
                      << "' at row " << currentRow << ", column " << currentCol << std::endl;
             position++;
@@ -125,8 +118,9 @@ std::vector<Token> Lexer::analyze(const std::string& input) {
         }
     }
     
-
-    tokens.push_back(Token("", TOKEN_ENDFILE, currentRow, currentCol));
+    // Add EOF token
+    Token eofToken("", TOKEN_EOF, currentRow, currentCol);
+    tokens.push_back(eofToken);
     
     return tokens;
 }
@@ -137,7 +131,7 @@ Token Lexer::scanToken(const std::string& input, size_t& startPos) {
     int lastAcceptingState = -1;
     size_t lastAcceptingPos = startPos;
     
-
+    // Handle string literals specially
     if (input[currentPos] == '"') {
         currentPos++;
         
@@ -145,27 +139,27 @@ Token Lexer::scanToken(const std::string& input, size_t& startPos) {
             if (input[currentPos] == '"') {
                 currentPos++;
                 std::string text = input.substr(startPos, currentPos - startPos);
-                return Token(text, TOKEN_TEXT, currentRow, currentCol);
+                return Token(text, TOKEN_STRING, currentRow, currentCol);
             } else if (input[currentPos] == '\\' && currentPos + 1 < input.size()) {
-
+                // Handle escape sequences
                 currentPos += 2;
             } else if (input[currentPos] == '\n') {
-
+                // Unterminated string
                 break;
             } else {
                 currentPos++;
             }
         }
         
-
+        // Unterminated string
         return Token("", TOKEN_INVALID, currentRow, currentCol);
     }
     
-
+    // Use automaton for other tokens
     while (currentPos < input.size()) {
         char ch = input[currentPos];
         
-
+        // Stop at whitespace or comments
         if (std::isspace(ch) || 
             (ch == '/' && currentPos + 1 < input.size() && input[currentPos + 1] == '/')) {
             break;
@@ -174,70 +168,69 @@ Token Lexer::scanToken(const std::string& input, size_t& startPos) {
         int nextState = recognizer.getNextState(ch, currentState);
         
         if (nextState < 0) {
-
+            // No valid transition
             break;
         }
         
         currentState = nextState;
         currentPos++;
         
-
+        // Check if current state is accepting
         if (recognizer.isAcceptingState(currentState)) {
             lastAcceptingState = currentState;
             lastAcceptingPos = currentPos;
         }
     }
     
-
+    // If we found a valid token
     if (lastAcceptingState >= 0) {
         std::string text = input.substr(startPos, lastAcceptingPos - startPos);
-        TokenKind kind = recognizer.getTokenKind(lastAcceptingState);
+        TokenType type = recognizer.getTokenType(lastAcceptingState);
         
-
-        if (kind == TOKEN_NUMERIC) {
-
+        // Check for keywords if this is an identifier
+        if (type == TOKEN_IDENTIFIER) {
+            static const std::map<std::string, TokenType> keywords = {
+                {"function", TOKEN_FUNCTION},
+                {"type", TOKEN_TYPE},
+                {"inherits", TOKEN_INHERITS},
+                {"new", TOKEN_NEW},
+                {"base", TOKEN_BASE},
+                {"if", TOKEN_IF},
+                {"elif", TOKEN_ELIF},
+                {"else", TOKEN_ELSE},
+                {"while", TOKEN_WHILE},
+                {"for", TOKEN_FOR},
+                {"in", TOKEN_IN},
+                {"is", TOKEN_IS},
+                {"as", TOKEN_AS},
+                {"let", TOKEN_LET},
+                {"print", TOKEN_PRINT},
+                {"true", TOKEN_TRUE},
+                {"false", TOKEN_FALSE},
+                {"Number", TOKEN_TYPE_NUMBER},
+                {"String", TOKEN_TYPE_STRING},
+                {"Boolean", TOKEN_TYPE_BOOLEAN},
+            };
+            
+            auto it = keywords.find(text);
+            if (it != keywords.end()) {
+                type = it->second;
+            }
+        }
+        
+        // Validate numeric tokens
+        if (type == TOKEN_NUMBER) {
+            // Make sure number is not followed by letter or underscore
             if (lastAcceptingPos < input.size() && 
                 (std::isalpha(input[lastAcceptingPos]) || input[lastAcceptingPos] == '_')) {
                 return Token("", TOKEN_INVALID, currentRow, currentCol);
             }
         }
         
-
-        if (kind == TOKEN_NAME) {
-
-            static const std::map<std::string, TokenKind> keywords = {
-                {"declare", TOKEN_DECLARE},
-                {"within", TOKEN_WITHIN},
-                {"procedure", TOKEN_PROCEDURE},
-                {"class", TOKEN_CLASS},
-                {"extends", TOKEN_EXTENDS},
-                {"create", TOKEN_CREATE},
-                {"super", TOKEN_SUPER},
-                {"when", TOKEN_WHEN},
-                {"elseif", TOKEN_ELSEIF},
-                {"otherwise", TOKEN_OTHERWISE},
-                {"loop", TOKEN_LOOP},
-                {"iterate", TOKEN_ITERATE},
-                {"instanceof", TOKEN_INSTANCEOF},
-                {"cast", TOKEN_CAST},
-                {"output", TOKEN_OUTPUT},
-                {"affirmative", TOKEN_AFFIRMATIVE},
-                {"negative", TOKEN_NEGATIVE},
-                {"Numeric", TOKEN_KIND_NUMERIC},
-                {"Text", TOKEN_KIND_TEXT},
-                {"Logical", TOKEN_KIND_LOGICAL},
-            };
-            
-            auto it = keywords.find(text);
-            if (it != keywords.end()) {
-                kind = it->second;
-            }
-        }
-        
-        return Token(text, kind, currentRow, currentCol);
+        return Token(text, type, currentRow, currentCol);
     }
     
-
+    // No valid token found
     return Token("", TOKEN_INVALID, currentRow, currentCol);
 }
 

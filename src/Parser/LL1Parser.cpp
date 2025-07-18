@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 namespace Parser {
 
@@ -345,14 +346,14 @@ void LL1Parser::validateParsingCompletion(const std::vector<Token>& tokens, size
 
 
 void LL1Parser::throwUnexpectedTokenError(const Token& lookahead) const {
-    throw std::runtime_error("Syntax error: unexpected token '" + lookahead.lexeme +
-                           "' at line " + std::to_string(lookahead.line));
+    throw std::runtime_error("Syntax error: unexpected token '" + lookahead.text +
+                           "' at line " + std::to_string(lookahead.row));
 }
 
 void LL1Parser::throwTerminalMismatchError(const std::string& expected, const Token& found) const {
     throw std::runtime_error("Syntax error: expected '" + expected +
-                           "' but found '" + found.lexeme +
-                           "' at line " + std::to_string(found.line));
+                           "' but found '" + found.text +
+                           "' at line " + std::to_string(found.row));
 }
 
 

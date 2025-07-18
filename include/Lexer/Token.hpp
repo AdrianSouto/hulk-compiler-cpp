@@ -1,79 +1,77 @@
 #pragma once
 #include <string>
 
-enum TokenKind {
-    // Literals and identifiers
-    TOKEN_NUMERIC,
-    TOKEN_TEXT,
-    TOKEN_NAME,
-    
+enum TokenType {
     // Keywords
-    TOKEN_DECLARE,
-    TOKEN_WITHIN,
-    TOKEN_PROCEDURE,
-    TOKEN_CLASS,
-    TOKEN_EXTENDS,
-    TOKEN_CREATE,
-    TOKEN_SUPER,
-    TOKEN_WHEN,
-    TOKEN_ELSEIF,
-    TOKEN_OTHERWISE,
-    TOKEN_LOOP,
-    TOKEN_ITERATE,
-    TOKEN_INSTANCEOF,
-    TOKEN_CAST,
-    TOKEN_OUTPUT,
-    TOKEN_AFFIRMATIVE,
-    TOKEN_NEGATIVE,
+    TOKEN_FUNCTION,
+    TOKEN_TYPE,
+    TOKEN_INHERITS,
+    TOKEN_NEW,
+    TOKEN_BASE,
+    TOKEN_IF,
+    TOKEN_ELIF,
+    TOKEN_ELSE,
+    TOKEN_WHILE,
+    TOKEN_FOR,
+    TOKEN_IN,
+    TOKEN_IS,
+    TOKEN_AS,
+    TOKEN_LET,
+    TOKEN_PRINT,
+    TOKEN_TRUE,
+    TOKEN_FALSE,
     
     // Type keywords
-    TOKEN_KIND_NUMERIC,
-    TOKEN_KIND_TEXT,
-    TOKEN_KIND_LOGICAL,
+    TOKEN_TYPE_NUMBER,
+    TOKEN_TYPE_STRING,
+    TOKEN_TYPE_BOOLEAN,
     
-    // Multi-character operators
-    TOKEN_EQUAL,         // ==
-    TOKEN_NOTEQUAL,      // !=
-    TOKEN_LESSEQUAL,     // <=
-    TOKEN_GREATEREQUAL,  // >=
-    TOKEN_LOGICAL_AND,   // &&
-    TOKEN_LOGICAL_OR,    // |
-    TOKEN_JOIN_SPACE,    // @@
-    TOKEN_IMPLIES,       // =>
-    TOKEN_EXPONENT,      // **
-    TOKEN_BIND,          // :=
-    
-    // Single character operators
-    TOKEN_ADD,           // +
-    TOKEN_SUBTRACT,      // -
-    TOKEN_TIMES,         // *
-    TOKEN_QUOTIENT,      // /
-    TOKEN_REMAINDER,     // %
-    TOKEN_JOIN,          // @
-    TOKEN_MATCH,         // =
-    TOKEN_BELOW,         // <
-    TOKEN_ABOVE,         // >
-    TOKEN_NEGATE,        // !
+    // Literals and identifiers
+    TOKEN_IDENTIFIER,
+    TOKEN_NUMBER,
+    TOKEN_STRING,
     
     // Delimiters
-    TOKEN_OPEN_PAREN,    // (
-    TOKEN_CLOSE_PAREN,   // )
-    TOKEN_OPEN_BRACE,    // {
-    TOKEN_CLOSE_BRACE,   // }
-    TOKEN_TERMINATOR,    // ;
-    TOKEN_SEPARATOR,     // ,
-    TOKEN_MARKER,        // :
-    TOKEN_ACCESSOR,      // .
+    TOKEN_LPAREN,        // (
+    TOKEN_RPAREN,        // )
+    TOKEN_LBRACE,        // {
+    TOKEN_RBRACE,        // }
+    TOKEN_SEMICOLON,     // ;
+    TOKEN_COMMA,         // ,
+    TOKEN_COLON,         // :
+    TOKEN_DOT,           // .
+    
+    // Operators
+    TOKEN_PLUS,          // +
+    TOKEN_MINUS,         // -
+    TOKEN_MULTIPLY,      // *
+    TOKEN_DIVIDE,        // /
+    TOKEN_MODULO,        // %
+    TOKEN_POWER,         // **
+    TOKEN_CONCAT,        // @
+    TOKEN_CONCAT_SPACE,  // @@
+    TOKEN_EQUALS,        // =
+    TOKEN_ASSIGN,        // :=
+    TOKEN_EQEQ,          // ==
+    TOKEN_NOTEQ,         // !=
+    TOKEN_LESS,          // <
+    TOKEN_LESSEQ,        // <=
+    TOKEN_GREATER,       // >
+    TOKEN_GREATEREQ,     // >=
+    TOKEN_AND,           // &&
+    TOKEN_OR,            // |
+    TOKEN_NOT,           // !
+    TOKEN_ARROW,         // =>
     
     // Special tokens
-    TOKEN_ENDFILE,
+    TOKEN_EOF,
     TOKEN_INVALID,
     TOKEN_UNDEFINED
 };
 
 struct Token {
     std::string text;
-    TokenKind kind;
+    TokenType type;
     int row;
     int col;
     
@@ -83,14 +81,13 @@ struct Token {
         double realValue;
     };
     
-    Token(const std::string& txt, TokenKind k, int r, int c) 
-        : text(txt), kind(k), row(r), col(c), wholeValue(0) {}
+    Token(const std::string& txt, TokenType t, int r, int c) 
+        : text(txt), type(t), row(r), col(c), wholeValue(0) {}
     
-    Token() : kind(TOKEN_UNDEFINED), row(0), col(0), wholeValue(0) {}
+    Token() : type(TOKEN_UNDEFINED), row(0), col(0), wholeValue(0) {}
 };
 
 // Helper functions
-std::string tokenKindToString(TokenKind kind);
-TokenKind getTokenCategory(TokenKind token);
-int getTokenPrecedence(TokenKind token);
-bool hasHigherPriority(TokenKind token1, TokenKind token2);
+std::string tokenTypeToString(TokenType type);
+int getTokenPrecedence(TokenType token);
+bool hasHigherPriority(TokenType token1, TokenType token2);

@@ -25,8 +25,8 @@ static void printNode(const ParseNode* node, int depth, bool isLast, std::string
     std::cout << node->symbol.value;
     
     // Print token info if it's a terminal
-    if (node->symbol.isTerminal() && !node->token.lexeme.empty()) {
-        std::cout << " [" << node->token.lexeme << "]";
+    if (node->symbol.isTerminal() && !node->token.text.empty()) {
+        std::cout << " [" << node->token.text << "]";
     }
     
     std::cout << std::endl;

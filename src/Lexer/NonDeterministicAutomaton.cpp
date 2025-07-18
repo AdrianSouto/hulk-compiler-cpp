@@ -121,7 +121,7 @@ FiniteAutomaton NonDeterministicAutomaton::convertToDeterministic() {
     std::map<std::set<int>, int> stateSetToId;
     std::map<int, std::vector<StateTransition>> dfaTransitions;
     std::vector<int> dfaAcceptingStates;
-    std::map<int, TokenKind> dfaAcceptingStateTokens;
+    std::map<int, TokenType> dfaAcceptingStateTokens;
     std::queue<std::set<int>> workQueue;
     
     int nextStateId = 0;
@@ -179,7 +179,7 @@ FiniteAutomaton NonDeterministicAutomaton::convertToDeterministic() {
     
 
     for (const auto& [state, kind] : dfaAcceptingStateTokens) {
-        dfa.setTokenKind(state, kind);
+        dfa.setTokenType(state, kind);
     }
     
     return dfa;
@@ -274,12 +274,12 @@ NonDeterministicAutomaton NonDeterministicAutomaton::createUnion(const NonDeterm
     
 
     for (const auto& [state, tokenKind] : first.acceptingStateTokens) {
-        result.setTokenKind(state + offset1, tokenKind);
+        result.setTokenType(state + offset1, tokenKind);
     }
     
 
     for (const auto& [state, tokenKind] : second.acceptingStateTokens) {
-        result.setTokenKind(state + offset2, tokenKind);
+        result.setTokenType(state + offset2, tokenKind);
     }
     
     return result;
@@ -325,7 +325,7 @@ NonDeterministicAutomaton NonDeterministicAutomaton::createConcatenation(const N
     
 
     for (const auto& [state, tokenKind] : second.acceptingStateTokens) {
-        result.setTokenKind(state + offset, tokenKind);
+        result.setTokenType(state + offset, tokenKind);
     }
     
     return result;

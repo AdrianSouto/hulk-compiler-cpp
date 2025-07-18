@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < tokens.size(); ++i) {
         const Token& token = tokens[i];
         std::cout << "Token " << (i + 1) << ": "
-                  << "Type=" << tokenKindToString(token.kind) 
+                  << "Type=" << tokenTypeToString(token.type)
                   << ", Text=\"" << token.text << "\""
                   << ", Row=" << token.row 
                   << ", Col=" << token.col << std::endl;
@@ -75,3 +75,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+

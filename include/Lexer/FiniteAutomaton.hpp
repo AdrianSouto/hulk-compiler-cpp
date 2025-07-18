@@ -13,7 +13,7 @@ private:
     std::vector<int> acceptingStates;
     std::set<char> inputAlphabet;
     std::map<int, std::vector<StateTransition>> stateTransitions;
-    std::map<int, TokenKind> acceptingStateTokens;
+    std::map<int, TokenType> acceptingStateTokens;
 
 public:
     // Constructor
@@ -39,8 +39,8 @@ public:
     
     // Getters
     int getInitialState() const { return initialState; }
-    TokenKind getTokenKind(int state) const;
-    void setTokenKind(int state, TokenKind kind);
+    TokenType getTokenType(int state) const;
+    void setTokenType(int state, TokenType type);
     
     // Friend class for NonDeterministicAutomaton to access private members
     friend class NonDeterministicAutomaton;

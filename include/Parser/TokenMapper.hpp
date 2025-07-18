@@ -11,7 +11,7 @@ public:
 
 private:
     // Internal method to map token type to string
-    std::string mapTokenTypeToString(TokenKind tokenKind) const;
+    std::string mapTokenTypeToString(TokenType tokenType) const;
 };
 
 } // namespace Parser
