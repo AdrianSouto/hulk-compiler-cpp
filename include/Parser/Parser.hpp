@@ -23,9 +23,6 @@ public:
     bool hasErrors() const { return !errors.empty(); }
     const std::vector<std::string>& getErrors() const { return errors; }
     void clearErrors() { errors.clear(); }
-    
-    // Debug
-    void printGrammarInfo() const;
 };
 
 } // namespace Parser

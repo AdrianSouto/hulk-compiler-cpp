@@ -26,12 +26,7 @@ public:
     
     // Validation methods (using ParserUtils)
     bool isLL1() const;
-    std::vector<std::string> getConflicts() const;
-    
-    // Debug methods (using ParserUtils)
-    void printFirst() const;
-    void printFollow() const;
-    void printParsingTable() const;
+
 
 private:
     // Core grammar data - using more efficient containers

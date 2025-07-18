@@ -8,9 +8,7 @@
 
 namespace Parser {
 
-// ============================================================================
-// STATIC LOADING METHOD
-// ============================================================================
+
 
 LL1Parser LL1Parser::loadFromFile(const std::string& grammarDir) {
     LL1Parser parser;
@@ -110,9 +108,7 @@ void LL1Parser::parseProduction(const std::string& prodLine) {
     }
 }
 
-// ============================================================================
-// FIRST AND FOLLOW SET CALCULATION
-// ============================================================================
+
 
 void LL1Parser::calculateFirst() {
     initializeFirstSets();
@@ -244,9 +240,6 @@ void LL1Parser::initializeGrammar() {
     buildParsingTable();
 }
 
-// ============================================================================
-// PARSING ALGORITHM (CORE FUNCTIONALITY)
-// ============================================================================
 
 std::unique_ptr<ParseTree> LL1Parser::parse(const std::vector<Token>& tokens) {
     auto root = std::make_unique<ParseNode>(startSymbol);
@@ -301,7 +294,8 @@ void LL1Parser::processTerminal(ParseNode* node, const std::vector<Token>& token
         node->token = lookahead;
         stack.pop();
         tokenIndex++;
-    } else {
+    }
+    else {
         throwTerminalMismatchError(node->symbol.value, lookahead);
     }
 }
@@ -349,9 +343,6 @@ void LL1Parser::validateParsingCompletion(const std::vector<Token>& tokens, size
     }
 }
 
-// ============================================================================
-// ERROR HANDLING METHODS
-// ============================================================================
 
 void LL1Parser::throwUnexpectedTokenError(const Token& lookahead) const {
     throw std::runtime_error("Syntax error: unexpected token '" + lookahead.lexeme +
@@ -364,28 +355,11 @@ void LL1Parser::throwTerminalMismatchError(const std::string& expected, const To
                            "' at line " + std::to_string(found.line));
 }
 
-// ============================================================================
-// VALIDATION AND DEBUG METHODS (USING PARSERUTILS)
-// ============================================================================
 
 bool LL1Parser::isLL1() const {
     return ParserUtils::isLL1Grammar(parsingTable);
 }
 
-std::vector<std::string> LL1Parser::getConflicts() const {
-    return ParserUtils::findConflicts(nonTerminals, productions, firstSets, followSets);
-}
 
-void LL1Parser::printFirst() const {
-    ParserUtils::printFirstSets(firstSets, nonTerminals);
-}
 
-void LL1Parser::printFollow() const {
-    ParserUtils::printFollowSets(followSets);
 }
-
-void LL1Parser::printParsingTable() const {
-    ParserUtils::printParsingTable(parsingTable);
-}
-
-} // namespace Parser

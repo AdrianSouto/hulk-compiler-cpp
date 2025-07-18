@@ -23,26 +23,6 @@ public:
         const std::unordered_map<std::string, std::unordered_map<std::string, size_t>>& parsingTable
     );
 
-    static std::vector<std::string> findConflicts(
-        const std::unordered_set<std::string>& nonTerminals,
-        const std::vector<Production>& productions,
-        const std::unordered_map<std::string, std::unordered_set<std::string>>& firstSets,
-        const std::unordered_map<std::string, std::unordered_set<std::string>>& followSets
-    );
-
-    // Debug printing utilities
-    static void printFirstSets(
-        const std::unordered_map<std::string, std::unordered_set<std::string>>& firstSets,
-        const std::unordered_set<std::string>& nonTerminals
-    );
-
-    static void printFollowSets(
-        const std::unordered_map<std::string, std::unordered_set<std::string>>& followSets
-    );
-
-    static void printParsingTable(
-        const std::unordered_map<std::string, std::unordered_map<std::string, size_t>>& parsingTable
-    );
 };
 
 } // namespace Parser
