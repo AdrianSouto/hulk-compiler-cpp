@@ -225,7 +225,7 @@ Token Lexer::scanToken(const std::string& input, size_t& startPos) {
                 {"negative", TOKEN_NEGATIVE},
                 {"Numeric", TOKEN_KIND_NUMERIC},
                 {"Text", TOKEN_KIND_TEXT},
-                {"Logical", TOKEN_KIND_LOGICAL}
+                {"Logical", TOKEN_KIND_LOGICAL},
             };
             
             auto it = keywords.find(text);
